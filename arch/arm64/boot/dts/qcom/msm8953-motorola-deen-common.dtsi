@@ -18,6 +18,26 @@
 #include "msm8953.dtsi"
 #include "pm8953.dtsi"
 
+/*
+ * Motorola Deen memory layout:
+ * - Move the inherited MSM8953 QSEE region from 0x85b00000/8 MiB
+ *   to the Deen-specific 0x84300000/32 MiB region used by mainline Deen.
+ * - Drop the continuous splash reservation because the initial Deen
+ *   display path is not enabled in this bring-up.
+ *
+ * These two inherited reservations are anonymous in the v6.1 MSM8953 DTSI,
+ * so delete them by their reserved-memory child names.
+ */
+&{/reserved-memory} {
+	/delete-node/ memory@85b00000;
+	/delete-node/ memory@90001000;
+
+	qseecom_mem: qseecom@84300000 {
+		reg = <0x0 0x84300000 0x0 0x02000000>;
+		no-map;
+	};
+};
+
 / {
 	vph_pwr: regulator-vph-pwr {
 		compatible = "regulator-fixed";
