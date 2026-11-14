@@ -213,7 +213,9 @@ jobs:
             git fetch origin main
             git switch -C main origin/main
             cp "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" documentation/ACK_BASE_CONFIG_SMOKE.md
-            cp "$OUT/.config" "$RUNNER_TEMP/ACK_GKI_CONFIG"
+            if [[ -s "$OUT/.config" ]]; then
+              cp "$OUT/.config" "$RUNNER_TEMP/ACK_GKI_CONFIG"
+            fi
             git add documentation/ACK_BASE_CONFIG_SMOKE.md
             if git diff --cached --quiet; then
               COMMITTED=1
