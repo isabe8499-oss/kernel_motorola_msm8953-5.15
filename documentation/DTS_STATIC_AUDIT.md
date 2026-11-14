@@ -17,6 +17,10 @@ Branch: `deen/dts-bringup`
 
 The ACK 5.15 `Documentation/devicetree/bindings/arm/qcom.yaml` predates the MSM8953 Deen compatible. The bring-up branch adds the minimal `motorola,deen` + `qcom,msm8953` pair, based on mainline commit `51c5d61ba73bde54d7900276cb1c0e37d416adfb`. This is a limited schema addition; it does not replace the old binding file.
 
+## Power-domain support backport
+
+The v6.1 MSM8953 DTSI references `MSM8953_VDDCX` and a `qcom,msm8953-rpmpd` provider. The ACK 5.15 baseline lacked those seven power-domain IDs and the matching rpmpd driver descriptor. The Deen branch now carries the narrowly scoped v6.1 backport in `include/dt-bindings/power/qcom-rpmpd.h` and `drivers/soc/qcom/rpmpd.c`, plus the `qcom,msm8953-rpmpd` compatible in `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`. The ACK smoke compiles `drivers/soc/qcom/rpmpd.o`; DTS validation will include this schema.
+
 ## Static phandle result
 
 - Label definitions found across the five files: **137**
