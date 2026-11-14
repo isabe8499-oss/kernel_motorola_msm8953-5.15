@@ -1,6 +1,10 @@
 name: Independently verify ACK 5.15 LTS import
 
 on:
+  push:
+    branches: ["main"]
+    paths:
+      - "documentation/ACK_IMPORT_LOCK.md"
   workflow_run:
     workflows:
       - Import full Android Common Kernel 14-5.15 LTS history
@@ -9,7 +13,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: verify-ack-515-import
+  cancel-in-progress: false
 
 jobs:
   verify-import:
@@ -44,7 +52,7 @@ jobs:
 
             remote_sha="$(git ls-remote origin "$remote_ref" | awk 'NR == 1 {print $1}')"
             if [[ "$remote_sha" != "$EXPECTED_ACK_SHA" ]]; then
-              echo "::error::$remote_ref points to '$remote_sha', expected $EXPECTED_ACK_SHA."
+              echo "::error::$remote_ref points to '${remote_sha:-missing}', expected $EXPECTED_ACK_SHA."
               exit 1
             fi
 
@@ -93,4 +101,42 @@ jobs:
             echo "- git fsck --full: passed"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "ACK source import passed independent remote-ref and object-integrity verification."
+          cat > "$RUNNER_TEMP/ACK_IMPORT_VERIFICATION.md" <<EOF
+          # Android Common Kernel import verification
+
+          - Result: PASS
+          - Verified upstream commit: $EXPECTED_ACK_SHA
+          - upstream/android14-5.15-lts: exact SHA match
+          - deen/bringup-ack515-base: exact SHA match
+          - Temporary staging ref: absent
+          - First-parent commits: $FIRST_PARENT_COUNT
+          - Reachable commits: $TOTAL_REACHABLE_COMMITS
+          - Git pack size: $PACK_SIZE
+          - Git object-store directory size: $REPOSITORY_DISK_SIZE
+          - Integrity check: git fsck --full passed
+
+          This verifies source-history integrity only. It is not a device build or boot test.
+          EOF
+
+          COMMITTED=0
+          for ATTEMPT in 1 2 3 4 5; do
+            git fetch origin main
+            git switch -C main origin/main
+            cp "$RUNNER_TEMP/ACK_IMPORT_VERIFICATION.md" documentation/ACK_IMPORT_VERIFICATION.md
+            git add documentation/ACK_IMPORT_VERIFICATION.md
+            if git diff --cached --quiet; then
+              COMMITTED=1
+              break
+            fi
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "ci: record successful ACK import integrity verification"
+            if git push origin HEAD:refs/heads/main; then
+              COMMITTED=1
+              break
+            fi
+            echo "main advanced during verification report publication; retrying."
+            sleep 3
+          done
+          test "$COMMITTED" -eq 1
+          echo "Independent import verification completed and its report was committed."
