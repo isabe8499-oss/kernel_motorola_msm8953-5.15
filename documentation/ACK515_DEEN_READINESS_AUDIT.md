@@ -4,7 +4,7 @@ Audit date: 2026-11-14
 
 ## 1. Source import gate
 
-Status: PASS.
+Status: PARTIAL PASS — source integrity and selected compile gates pass; full Image link and clean PVT schema acceptance remain open.
 
 - Official source: https://android.googlesource.com/kernel/common
 - Branch: android14-5.15-lts
@@ -59,15 +59,15 @@ Branch deen/dts-bringup is based on the pinned ACK commit. It now contains:
 - MSM8953 RPM power-domain IDs, driver descriptor and bindings backported from v6.1;
 - the minimal motorola,deen compatible binding.
 
-CI run 43620086484 compiled the base fixture and both PVT candidate DTBs. dt-doc-validate, schema generation and targeted dt-validate all returned exit code 0; the backported rpmpd.o also compiled. The branch is still an experimental minimal board description, not a complete or bootable Deen tree.
+CI run 43623081943 compiled the base fixture and both PVT candidate DTBs, verified board-ID/QSEE read-back, and compiled the backported rpmpd.o. Although validator processes returned exit code 0, the PVT logs contain 160 diagnostic lines because v6.1 DTSI sources are being checked against ACK 5.15 schemas. Full-tree schema acceptance is HOLD; see `documentation/DTS_SCHEMA_DIAGNOSTIC_TRIAGE.md`. The branch is still an experimental minimal board description, not a complete or bootable Deen tree.
 
 ## 6. Next-phase plan and acceptance criteria
 
-### Phase A — SoC DTSI, bindings and minimal board syntax/schema: PASS
+### Phase A — SoC DTSI, bindings and minimal board syntax: PARTIAL PASS; full-tree schema: HOLD
 1. The imported v6.1 MSM8953/PM8953 DTSI files are integrated on the isolated Deen branch.
 2. The Deen QSEE reservation, PM8953 RPM rails, volume keys, primary eMMC and two PVT wrappers are present.
 3. The MSM8953 RPM power-domain driver and dt-bindings were selectively backported with provenance.
-4. CI run 43620086484 compiled the synthetic base fixture and PVT1/PVT2 DTBs, passed dt-doc-validate, processed schema generation and targeted dt-validate, and compiled the branch rpmpd.o.
+4. CI run 43623081943 compiled the synthetic base fixture and PVT1/PVT2 DTBs, verified binary board-ID/QSEE properties and compiled the branch rpmpd.o. Full-tree schema diagnostics remain unresolved.
 
 ### Phase B — Full kernel link and Deen board description
 1. Compare both PVT1/PVT2 donor DTS files and board IDs; determine exact XT1941-3 hardware revision using available device/bootloader evidence.
@@ -91,7 +91,7 @@ CI run 43620086484 compiled the base fixture and both PVT candidate DTBs. dt-doc
 
 ## 7. Current decision
 
-The source import, ACK config/object smoke and minimal Deen DTS compile/schema smoke are approved. A full generic-GKI Image link with MSM8953 options and the two Deen candidate DTBs is now running as a separate CI gate. The Deen-specific defconfig, complete peripheral stack, boot-image packaging and device boot are not approved.
+The source import, ACK config/object smoke and minimal Deen DTS syntax/binary-property smoke are approved. Full-tree PVT schema validation is on HOLD due to 160 diagnostics. The generic-GKI full Image attempt was interrupted by runner shutdown and is being retried. The Deen-specific defconfig, complete peripheral stack, boot-image packaging and device boot are not approved.
 
 No device drivers have been copied into the upstream branch, no donor branch has been modified, and no flashable artifact is claimed.
 
@@ -112,7 +112,7 @@ The initial temporary DTSI fixture workflow has been superseded by the Deen boar
 - Passing run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43620086484
 - Tested branch commit: d86ecf2fa95fe3635b4ffc606fdd39b048760d1e
 - Tested artifacts: base fixture, PVT1 DTB and PVT2 DTB
-- Schema checks: dt-doc-validate, processed schema generation and targeted dt-validate all exit 0
+- Schema process exit codes: 0, but 160 diagnostic lines remain; see `documentation/DTS_SCHEMA_DIAGNOSTIC_TRIAGE.md`
 - Backported MSM8953 rpmpd.o compiled.
 
 A separate full Image build is running:
