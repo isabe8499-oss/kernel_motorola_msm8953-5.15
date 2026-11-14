@@ -14,3 +14,4 @@
 The two permanent refs were independently compared against the pinned source commit using GitHub's compare endpoint. Both comparisons returned identical, with zero commits ahead and zero behind.
 
 This file locks the source import only. It does not claim that Deen device support has been ported, that the kernel builds for this device, or that it boots on the Motorola One Deen.
+- Independent verification report: documentation/ACK_IMPORT_VERIFICATION.md (created only if the separate CI integrity gate passes).
