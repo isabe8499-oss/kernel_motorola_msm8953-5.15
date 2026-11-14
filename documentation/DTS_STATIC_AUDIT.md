@@ -57,4 +57,4 @@ It intentionally does not enable SDHC2, USB, remote processors, NFC, display, to
 5. UART console route must be confirmed before enabling.
 6. The eMMC and PMIC electrical configuration has not been tested on hardware.
 
-No DTB from this branch is approved for flashing.
+No DTB from this branch is approved for flashing. The CI result is a syntax/binding smoke only, not a full hardware/boot validation.
