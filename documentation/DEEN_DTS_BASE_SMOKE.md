@@ -2,7 +2,7 @@
 
 - Result: FAIL
 - Branch: deen/dts-bringup
-- Branch commit: 6bd8b100fc656c2a7eb51d5356253486dd699538
+- Branch commit: c963cbd09a77488721ad23f8917a985f8a0aed95
 - SoC DTSI source: Linux v6.1, blob 6b992a6d56c16d5151785df04fa2053c67ee7fad
 - PMIC DTSI source: Linux v6.1, blob a1d36f9ebbd259e41a80e3af516d9a044419afe0
 - ACK base: Android Common Kernel 5.15 LTS
@@ -60,73 +60,73 @@ make: Leaving directory '/home/runner/work/_temp/deen-src'
 	from schema $id: http://devicetree.org/meta-schemas/base.yaml
 
 ## Last dtbs_check log lines
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu5-thermal: polling-delay-passive: b'\x00\x00\x00\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'
+	from schema $id: http://devicetree.org/schemas/soc/qcom/qcom,smd-rpm.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: power-controller (qcom,msm8953-rpmpd): 'clock-names', 'clocks' do not match any of the regexes: '^pinctrl-[0-9]+$'
+	from schema $id: http://devicetree.org/schemas/power/qcom,rpmpd.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: smsm (qcom,smsm): qcom,ipc-1: b'\x00\x00\x00\x0f\x00\x00\x00\x08\x00\x00\x00\r' is not of type 'object', 'integer', 'array', 'boolean', 'null'
 	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu5-thermal: polling-delay: b'\x00\x00\x03\xe8' is not of type 'object', 'integer', 'array', 'boolean', 'null'
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: smsm (qcom,smsm): qcom,ipc-3: b'\x00\x00\x00\x0f\x00\x00\x00\x08\x00\x00\x00\x13' is not of type 'object', 'integer', 'array', 'boolean', 'null'
 	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu5-thermal: thermal-sensors: b'\x00\x00\x00@\x00\x00\x00\x05' is not of type 'object', 'integer', 'array', 'boolean', 'null'
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: thermal-sensor@4a9000 (qcom,msm8953-tsens): compatible: 'oneOf' conditional failed, one must be fixed:
+	['qcom,msm8953-tsens', 'qcom,tsens-v2'] is too long
+	'qcom,msm8953-tsens' is not one of ['qcom,ipq8064-tsens']
+	'qcom,msm8953-tsens' is not one of ['qcom,mdm9607-tsens', 'qcom,msm8916-tsens', 'qcom,msm8939-tsens', 'qcom,msm8974-tsens']
+	'qcom,msm8953-tsens' is not one of ['qcom,msm8976-tsens', 'qcom,qcs404-tsens']
+	'qcom,msm8953-tsens' is not one of ['qcom,msm8996-tsens', 'qcom,msm8998-tsens', 'qcom,sc7180-tsens', 'qcom,sc7280-tsens', 'qcom,sc8180x-tsens', 'qcom,sdm630-tsens', 'qcom,sdm845-tsens', 'qcom,sm8150-tsens', 'qcom,sm8250-tsens', 'qcom,sm8350-tsens']
+	'qcom,tsens-v0_1' was expected
+	'qcom,tsens-v1' was expected
+	from schema $id: http://devicetree.org/schemas/thermal/qcom-tsens.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-clk-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-clk-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-cmd-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-cmd-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-data-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-data-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-rclk-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-rclk-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-clk-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-clk-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-cmd-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-cmd-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-data-on-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-data-off-pins: 'function' is a required property
+	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: clock-controller@1800000 (qcom,gcc-msm8953): 'clock-names', 'clocks' do not match any of the regexes: '^pinctrl-[0-9]+$'
+	from schema $id: http://devicetree.org/schemas/clock/qcom,gcc.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: spmi@200f000 (qcom,spmi-pmic-arb): reg: [[33615872, 4096], [37748736, 8388608], [46137344, 8388608], [58720256, 2097152], [33595392, 8448]] is too long
+	from schema $id: http://devicetree.org/schemas/spmi/spmi.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: spmi@200f000 (qcom,spmi-pmic-arb): qcom,ee: b'\x00\x00\x00\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
 	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: temperature: b'\x00\x018\x80' is not of type 'object', 'integer', 'array', 'boolean', 'null'
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: spmi@200f000 (qcom,spmi-pmic-arb): qcom,channel: b'\x00\x00\x00\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
 	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: hysteresis: b'\x00\x00\x07\xd0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: rtc@6000 (qcom,pm8941-rtc): reg: [[24576], [24832]] is too long
+	from schema $id: http://devicetree.org/schemas/rtc/qcom-pm8xxx-rtc.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: rtc@6000 (qcom,pm8941-rtc): 'reg-names' does not match any of the regexes: '^pinctrl-[0-9]+$'
+	from schema $id: http://devicetree.org/schemas/rtc/qcom-pm8xxx-rtc.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): compatible:0: 'qcom,msm8953-dwc3' is not one of ['qcom,msm8996-dwc3', 'qcom,msm8998-dwc3', 'qcom,sc7180-dwc3', 'qcom,sc7280-dwc3', 'qcom,sdm660-dwc3', 'qcom,sdm845-dwc3', 'qcom,sdx55-dwc3', 'qcom,sm4250-dwc3', 'qcom,sm6115-dwc3', 'qcom,sm8150-dwc3', 'qcom,sm8250-dwc3', 'qcom,sm8350-dwc3']
+	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): clock-names:3: 'mock_utmi' was expected
+	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): clock-names:4: 'sleep' was expected
+	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): interrupts: [[0, 136, 4], [0, 220, 4]] is too short
+	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): interrupt-names: ['hs_phy_irq', 'ss_phy_irq'] is too short
+	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@7000000 (snps,dwc3): phy_mode: b'utmi\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
 	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: type: b'passive\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: temperature: b'\x00\x01\x86\xa0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: hysteresis: b'\x00\x00\x07\xd0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: type: b'critical\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: map0: trip: b'\x00\x00\x00F' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: map0: cooling-device: b'\x00\x00\x00\t\xff\xff\xff\xff\xff\xff\xff\xff' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu6-thermal: polling-delay-passive: b'\x00\x00\x00\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu6-thermal: polling-delay: b'\x00\x00\x03\xe8' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu6-thermal: thermal-sensors: b'\x00\x00\x00@\x00\x00\x00\x06' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: temperature: b'\x00\x018\x80' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: hysteresis: b'\x00\x00\x07\xd0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: type: b'passive\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: temperature: b'\x00\x01\x86\xa0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: hysteresis: b'\x00\x00\x07\xd0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: type: b'critical\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: map0: trip: b'\x00\x00\x00G' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: map0: cooling-device: b'\x00\x00\x00\n\xff\xff\xff\xff\xff\xff\xff\xff' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu7-thermal: polling-delay-passive: b'\x00\x00\x00\xfa' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu7-thermal: polling-delay: b'\x00\x00\x03\xe8' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: cpu7-thermal: thermal-sensors: b'\x00\x00\x00@\x00\x00\x00\x07' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: temperature: b'\x00\x018\x80' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: hysteresis: b'\x00\x00\x07\xd0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: trip-point0: type: b'passive\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: temperature: b'\x00\x01\x86\xa0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: hysteresis: b'\x00\x00\x07\xd0' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: crit: type: b'critical\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: map0: trip: b'\x00\x00\x00H' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: map0: cooling-device: b'\x00\x00\x00\x0b\xff\xff\xff\xff\xff\xff\xff\xff' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: regulator-vph-pwr (regulator-fixed): regulator-name: b'vph_pwr\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: key-volume-up: linux,code: b'\x00\x00\x00s' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
+/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: mailbox@b011000 (qcom,msm8953-apcs-kpss-global): compatible: ['qcom,msm8953-apcs-kpss-global', 'syscon'] is too long
+	from schema $id: http://devicetree.org/schemas/mailbox/qcom,apcs-kpss-global.yaml
