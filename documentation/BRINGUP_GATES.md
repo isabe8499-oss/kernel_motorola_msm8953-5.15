@@ -40,7 +40,7 @@ dt-doc-validate, processed schema generation and targeted dt-validate returned e
 
 Evidence and DTB hashes are in documentation/DEEN_DTS_BASE_SMOKE.md; source inventory and static audit are in documentation/DTS_STATIC_AUDIT.md.
 
-The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qualcomm ARM binding) were compared with the current deen/dts-bringup branch and are unchanged. Subsequent changes on that branch are documentation-only.
+The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qualcomm ARM binding) were compared with the current deen/dts-bringup branch and are unchanged. Subsequent changes on that branch are documentation-only. A further binary read-back test using fdtget is running in CI run 43623081943; it checks the actual compiled qcom,board-id values, QSEE reg cells and absence of the two replaced memory nodes.
 
 ## Gate D — full kernel Image link: RUNNING / NOT YET APPROVED
 
