@@ -10,11 +10,11 @@ This repository is kept separate from the existing Linux 3.18.140 and 4.19.325 t
 
 ## Source strategy
 
-- Android Common Kernel (ACK): `aosp-mirror/kernel_common`, branch `android14-5.15`.
+- Android Common Kernel (ACK): `https://android.googlesource.com/kernel/common`, branch `android14-5.15-lts`.
 - Device-specific donor: `isabe8499-oss/kernel_motorola_msm8953-22`, branch `4.19.325-WIP`.
 - Legacy reference: `isabe8499-oss/kernel_motorola_msm8953`, branch `lineage-18.1`.
 
-The ACK branch head observed during initial inventory is pinned in `UPSTREAM_BASE.md` (commit `a9ee5509a0c552cb7bd7846b03b538dc2cba7585`). This repository records the reference but does not yet contain a full ACK checkout. Device drivers and board support are ported selectively; the 4.19 tree is not copied wholesale into ACK.
+The import target is pinned to `5cb316cf9d39318326075731e4e0c39b725d9c99`. The first full-history push failed with HTTP 500; GitHub's 2 GiB single-push limit is the likely cause. The import workflow has been changed to send sequential first-parent checkpoints below that limit. The complete import is not yet verified. Device drivers and board support are ported selectively; the 4.19 tree is not copied wholesale into ACK.
 
 ## Required engineering rules
 
