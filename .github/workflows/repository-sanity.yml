@@ -1,0 +1,26 @@
+name: Repository sanity checks
+
+on:
+  push:
+    branches: ["main", "deen/bringup", "ci/kernel-build"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate repository inventory
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s documentation/SOURCE_INVENTORY.md
+          test -s documentation/PORTING_MATRIX.md
+          test -s documentation/VALIDATION_PLAN.md
+          grep -q 'android14-5.15' documentation/SOURCE_INVENTORY.md
+          grep -q 'MACH_MOTOROLA_DEEN' documentation/PORTING_MATRIX.md
+          echo "Documentation inventory checks passed."
