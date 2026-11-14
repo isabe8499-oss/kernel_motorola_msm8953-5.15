@@ -283,8 +283,8 @@ jobs:
           {
             echo "## Android Common Kernel 5.15 LTS import completed"
             echo
-            echo "- Pinned commit: `$ACK_SHA`"
+            echo "- Pinned commit: $ACK_SHA"
             echo "- First-parent checkpoints: $FIRST_PARENT_COUNT"
             echo "- Incremental Git pushes: $PUSH_COUNT"
-            echo "- Permanent refs: `upstream/android14-5.15-lts`, `deen/bringup-ack515-base`"
+            echo "- Permanent refs: upstream/android14-5.15-lts, deen/bringup-ack515-base"
           } >> "$GITHUB_STEP_SUMMARY"
