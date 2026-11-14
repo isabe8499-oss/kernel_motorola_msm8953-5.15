@@ -1,0 +1,5 @@
+# Full kernel Image validation trigger
+
+Request a full arm64 Image link using GKI defconfig plus MSM8953/QCOM PMIC/eMMC options; build both Deen PVT candidate DTBs from the isolated bring-up branch. This is CI-only, not a boot image or flash request.
+
+Trigger request: 2026-11-14T14:35:00-03:00.
