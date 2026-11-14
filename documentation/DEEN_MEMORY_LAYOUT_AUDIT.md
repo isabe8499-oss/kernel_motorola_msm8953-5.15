@@ -68,8 +68,8 @@ The donor's `other_ext_mem` (37 MiB at `0x84300000`) and `qcom_seecom` (32 MiB a
 ## 4. Validation status
 
 - Static arithmetic: complete.
-- DTC compilation of the QSEE replacement and splash deletion: pending the current CI run.
-- Processed-schema validation of the Deen DTBs: pending the current CI run.
+- DTC compilation of the QSEE replacement and splash deletion: PASS in CI run 43620086484 (both PVT DTBs compiled).
+- Processed-schema validation of the Deen DTBs: PASS in CI run 43620086484 (dt-doc-validate, schema generation and targeted dt-validate all exit 0).
 - Physical DRAM map and bootloader memory carve-outs: not available from repository evidence.
 - Actual board revision and memory map from the XT1941-3 handset: not yet identified.
 
