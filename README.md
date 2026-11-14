@@ -4,9 +4,9 @@ Independent clean kernel bring-up for Motorola One Deen (XT1941 series, Qualcomm
 
 ## Project status
 
-**Source import completed; Deen bring-up has not started and there is no bootable kernel yet.**
+**ACK source import and Git object-integrity verification passed. Deen-specific 5.15 bring-up is in preparation; no bootable kernel exists yet.**
 
-The project control branch `main` contains documentation and CI. The full Android Common Kernel source history is available on the permanent branches below. Existing Linux 3.18.140 and 4.19.325 repositories remain read-only donors.
+Existing Linux 3.18.140 and 4.19.325 repositories remain read-only donors.
 
 ## Source branches
 
@@ -14,16 +14,18 @@ The project control branch `main` contains documentation and CI. The full Androi
 - Deen bring-up base: `deen/bringup-ack515-base`
 - Pinned ACK commit: `5cb316cf9d39318326075731e4e0c39b725d9c99`
 - Kernel version at imported tip: Linux 5.15.223
-- Device donor: `isabe8499-oss/kernel_motorola_msm8953-22`, branch `4.19.325-WIP`, audited tip `b7ef28b2acd6a61a4d890b87e57e0d5de6c93c4e`.
-- Legacy reference: `isabe8499-oss/kernel_motorola_msm8953`, branch `lineage-18.1`, audited tip `1f700e4c2e31c435358e7531dfc0c2e41e2a2684`.
+- Device donor: `isabe8499-oss/kernel_motorola_msm8953-22`, branch `4.19.325-WIP`, tip `b7ef28b2acd6a61a4d890b87e57e0d5de6c93c4e`.
+- Legacy reference: `isabe8499-oss/kernel_motorola_msm8953`, branch `lineage-18.1`, tip `1f700e4c2e31c435358e7531dfc0c2e41e2a2684`.
 
-The ACK history import traversed 63,852 first-parent commits and was published through 64 sequential increments. Both permanent refs compare as identical to the pinned upstream commit. The import workflow now runs a full Git object-integrity check and records its verification report before the source gate can be considered complete.
+The import traversed 63,852 first-parent commits in 64 pushes. Both permanent refs are identical to the pinned upstream commit. The independent report `documentation/ACK_IMPORT_VERIFICATION.md` records successful remote ref checks and `git fsck --full`.
 
-## Important hardware-port findings
+## Hardware-port findings
 
-The pinned ACK already contains MSM8953 GCC clock and pinctrl drivers, plus Qualcomm SDHCI and TSENS support. It does not contain the Deen/MSM8953 board DTS, the vendor KGSL tree or the legacy MSM camera stack used by the 4.19 donor. The port therefore requires a carefully normalized SoC/board DTS and separate vendor-ABI work; it is not a straight defconfig transplant.
+ACK 5.15 already contains MSM8953 GCC clock, pinctrl, SDHCI, USB HS PHY, remoteproc, SMD RPM and TSENS driver support. It does not contain the MSM8953/PM8953/PMI8950 Device Tree base or Deen board DTS.
 
-PVT1 and PVT2 donor DTS files use board IDs `0x4D 0xC100` and `0x4D 0xC200`. The exact hardware revision in the handset must be identified before selecting the final DTB.
+Mainline Linux added an initial Motorola Deen DTS in September 2026. It is a useful reference for generic bindings, but only describes an initial subset of hardware and depends on a much newer MSM8953 DTS than the 5.15 branch. See `documentation/DEEN_MAINLINE_DTS_AUDIT.md` before adding device-tree files.
+
+The 4.19 donor has PVT1 and PVT2 DTS variants with board IDs `0x4D 0xC100` and `0x4D 0xC200`. The actual revision in the handset remains to be identified; do not select or flash a DTB based only on XT1941-3.
 
 ## Engineering rules
 
@@ -33,12 +35,5 @@ PVT1 and PVT2 donor DTS files use board IDs `0x4D 0xC100` and `0x4D 0xC200`. The
 4. A successful compile is not proof of bootability or hardware compatibility.
 5. Require source SHA, build logs, resolved config, artifact hashes, DTB validation and rollback instructions for device tests.
 6. Never flash an unverified image; keep a known-good boot image and recovery route.
-
-## Repository layout
-
-- `documentation/`: source inventory, gap audit, porting matrix, validation plan and build design
-- `.github/workflows/`: source import, integrity validation and build smoke CI
-- `upstream/android14-5.15-lts`: unmodified Android Common Kernel history
-- `deen/bringup-ack515-base`: clean starting point for Deen-specific patches
 
 No Deen 5.15 defconfig, DTS/DTBO, ported vendor driver or boot image has been created yet.
