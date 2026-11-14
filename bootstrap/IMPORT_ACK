@@ -7,4 +7,4 @@ This marker triggers the repository workflow that fetches the full upstream Git 
 
 The workflow must verify the expected commit before pushing. If upstream advances before the workflow runs, it stops instead of silently importing a different snapshot.
 
-Retry: idempotent recovery of the completed 64-checkpoint import; permanent-ref read-back; race-safe metadata commit. Request timestamp: 2026-11-14T11:15:00-03:00.
+Retry: idempotent recovery of the completed 64-checkpoint import; permanent-ref read-back; race-safe metadata commit. Request timestamp: 2026-11-14T11:30:00-03:00.
