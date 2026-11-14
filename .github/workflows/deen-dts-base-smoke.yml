@@ -158,12 +158,15 @@ jobs:
           QSEE_LAYOUT_STATUS=1
           if [[ "$DTS_STATUS" -eq 0 && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
             set +e
-            PVT1_ID="$(fdtget -t x "$PVT1_DTB" / qcom,board-id 2>&1 | tr '[:upper:]' '[:lower:]')"
-            PVT1_RC=${PIPESTATUS[0]}
-            PVT2_ID="$(fdtget -t x "$PVT2_DTB" / qcom,board-id 2>&1 | tr '[:upper:]' '[:lower:]')"
-            PVT2_RC=${PIPESTATUS[0]}
-            QSEE_REG="$(fdtget -t x "$PVT1_DTB" /reserved-memory/qseecom@84300000 reg 2>&1 | tr '[:upper:]' '[:lower:]')"
-            QSEE_RC=${PIPESTATUS[0]}
+            PVT1_RAW="$(fdtget -t x "$PVT1_DTB" / qcom,board-id 2>&1)"
+            PVT1_RC=$?
+            PVT2_RAW="$(fdtget -t x "$PVT2_DTB" / qcom,board-id 2>&1)"
+            PVT2_RC=$?
+            QSEE_RAW="$(fdtget -t x "$PVT1_DTB" /reserved-memory/qseecom@84300000 reg 2>&1)"
+            QSEE_RC=$?
+            PVT1_ID="$(printf '%s' "$PVT1_RAW" | tr '[:upper:]' '[:lower:]')"
+            PVT2_ID="$(printf '%s' "$PVT2_RAW" | tr '[:upper:]' '[:lower:]')"
+            QSEE_REG="$(printf '%s' "$QSEE_RAW" | tr '[:upper:]' '[:lower:]')"
             if [[ "$PVT1_RC" -eq 0 && "$PVT2_RC" -eq 0 && "$PVT1_ID" = "4d c100" && "$PVT2_ID" = "4d c200" ]]; then
               BOARD_ID_STATUS=0
             else
