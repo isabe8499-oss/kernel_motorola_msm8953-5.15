@@ -2,14 +2,17 @@
 
 - Result: FAIL
 - Branch: deen/dts-bringup
-- Branch commit: c963cbd09a77488721ad23f8917a985f8a0aed95
+- Branch commit: 22c973d699252404ea0fdb1fb8cebf01abb0736e
 - SoC DTSI source: Linux v6.1, blob 6b992a6d56c16d5151785df04fa2053c67ee7fad
 - PMIC DTSI source: Linux v6.1, blob a1d36f9ebbd259e41a80e3af516d9a044419afe0
 - ACK base: Android Common Kernel 5.15 LTS
 - Compiler: Ubuntu clang version 18.1.3 (1ubuntu1)
 - Test: generated base fixture plus Deen PVT1/PVT2 DTBs
-- qcom.yaml dt_binding_check exit: 1
-- qcom.yaml dtbs_check exit: 0
+- dt-doc-validate exit: 0
+- dt-mk-schema exit: 0
+- targeted dt-validate exit: 1
+- Backported MSM8953 rpmpd.o SHA-256:
+  7080ba714a8135cfb7f48c483ed29bfc6d470e1c490ca0afdb186487bedbfe1d  /home/runner/work/_temp/deen-out/drivers/soc/qcom/rpmpd.o
 - Base-only fixture DTB SHA-256: cc6135f44e12cadf1422d817e5d639143bacca0325c582e7cce385864a37da85
 - Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): 6f6cd605790286deebd3dc01ade4d3d774df75eb4e7a7835ec9b883b81b6f1b2
 - Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): aca3ae7df6379a2410b03b03877ca9b014a8d54d14f01327b274e316f5cf5f3b
@@ -19,34 +22,6 @@ This is only a base-DTS syntax/include smoke test. It has no Deen PVT board ID o
 ## Last DTS compile log lines
 make: Entering directory '/home/runner/work/_temp/deen-src'
 make[1]: Entering directory '/home/runner/work/_temp/deen-out'
-  SYNC    include/config/auto.conf.cmd
-  GEN     Makefile
-  HOSTCC  scripts/dtc/dtc.o
-  HOSTCC  scripts/dtc/flattree.o
-  HOSTCC  scripts/dtc/fstree.o
-  HOSTCC  scripts/dtc/data.o
-  HOSTCC  scripts/dtc/livetree.o
-  HOSTCC  scripts/dtc/treesource.o
-  HOSTCC  scripts/dtc/srcpos.o
-  HOSTCC  scripts/dtc/checks.o
-  HOSTCC  scripts/dtc/util.o
-  LEX     scripts/dtc/dtc-lexer.lex.c
-  YACC    scripts/dtc/dtc-parser.tab.[ch]
-  HOSTCC  scripts/dtc/dtc-lexer.lex.o
-  HOSTCC  scripts/dtc/dtc-parser.tab.o
-  HOSTCC  scripts/dtc/yamltree.o
-  HOSTLD  scripts/dtc/dtc
-  HOSTCC  scripts/dtc/libfdt/fdt.o
-  HOSTCC  scripts/dtc/libfdt/fdt_ro.o
-  HOSTCC  scripts/dtc/libfdt/fdt_wip.o
-  HOSTCC  scripts/dtc/libfdt/fdt_sw.o
-  HOSTCC  scripts/dtc/libfdt/fdt_rw.o
-  HOSTCC  scripts/dtc/libfdt/fdt_strerror.o
-  HOSTCC  scripts/dtc/libfdt/fdt_empty_tree.o
-  HOSTCC  scripts/dtc/libfdt/fdt_addresses.o
-  HOSTCC  scripts/dtc/libfdt/fdt_overlay.o
-  HOSTCC  scripts/dtc/fdtoverlay.o
-  HOSTLD  scripts/dtc/fdtoverlay
   UPD     include/config/kernel.release
   DTC     arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb
   DTC     arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
@@ -54,79 +29,149 @@ make[1]: Entering directory '/home/runner/work/_temp/deen-out'
 make[1]: Leaving directory '/home/runner/work/_temp/deen-out'
 make: Leaving directory '/home/runner/work/_temp/deen-src'
 
-## Last dt_binding_check log lines
-/home/runner/work/_temp/deen-src/Documentation/devicetree/bindings/arm/qcom.yaml: title: 'QCOM device tree bindings' should not be valid under {'pattern': '([Bb]inding| [Ss]chema)'}
-	hint: Everything is a binding/schema, no need to say it. Describe what hardware the binding is for.
-	from schema $id: http://devicetree.org/meta-schemas/base.yaml
+## Last dt-doc-validate log lines
 
-## Last dtbs_check log lines
-	from schema $id: http://devicetree.org/schemas/soc/qcom/qcom,smd-rpm.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: power-controller (qcom,msm8953-rpmpd): 'clock-names', 'clocks' do not match any of the regexes: '^pinctrl-[0-9]+$'
-	from schema $id: http://devicetree.org/schemas/power/qcom,rpmpd.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: smsm (qcom,smsm): qcom,ipc-1: b'\x00\x00\x00\x0f\x00\x00\x00\x08\x00\x00\x00\r' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: smsm (qcom,smsm): qcom,ipc-3: b'\x00\x00\x00\x0f\x00\x00\x00\x08\x00\x00\x00\x13' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: thermal-sensor@4a9000 (qcom,msm8953-tsens): compatible: 'oneOf' conditional failed, one must be fixed:
-	['qcom,msm8953-tsens', 'qcom,tsens-v2'] is too long
-	'qcom,msm8953-tsens' is not one of ['qcom,ipq8064-tsens']
-	'qcom,msm8953-tsens' is not one of ['qcom,mdm9607-tsens', 'qcom,msm8916-tsens', 'qcom,msm8939-tsens', 'qcom,msm8974-tsens']
-	'qcom,msm8953-tsens' is not one of ['qcom,msm8976-tsens', 'qcom,qcs404-tsens']
-	'qcom,msm8953-tsens' is not one of ['qcom,msm8996-tsens', 'qcom,msm8998-tsens', 'qcom,sc7180-tsens', 'qcom,sc7280-tsens', 'qcom,sc8180x-tsens', 'qcom,sdm630-tsens', 'qcom,sdm845-tsens', 'qcom,sm8150-tsens', 'qcom,sm8250-tsens', 'qcom,sm8350-tsens']
-	'qcom,tsens-v0_1' was expected
-	'qcom,tsens-v1' was expected
-	from schema $id: http://devicetree.org/schemas/thermal/qcom-tsens.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-clk-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-clk-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-cmd-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-cmd-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-data-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-data-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-rclk-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc1-rclk-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-clk-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-clk-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-cmd-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-cmd-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-data-on-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: pinctrl@1000000 (qcom,msm8953-pinctrl): sdc2-data-off-pins: 'function' is a required property
-	from schema $id: http://devicetree.org/schemas/pinctrl/qcom,msm8953-pinctrl.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: clock-controller@1800000 (qcom,gcc-msm8953): 'clock-names', 'clocks' do not match any of the regexes: '^pinctrl-[0-9]+$'
-	from schema $id: http://devicetree.org/schemas/clock/qcom,gcc.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: spmi@200f000 (qcom,spmi-pmic-arb): reg: [[33615872, 4096], [37748736, 8388608], [46137344, 8388608], [58720256, 2097152], [33595392, 8448]] is too long
-	from schema $id: http://devicetree.org/schemas/spmi/spmi.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: spmi@200f000 (qcom,spmi-pmic-arb): qcom,ee: b'\x00\x00\x00\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: spmi@200f000 (qcom,spmi-pmic-arb): qcom,channel: b'\x00\x00\x00\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: rtc@6000 (qcom,pm8941-rtc): reg: [[24576], [24832]] is too long
-	from schema $id: http://devicetree.org/schemas/rtc/qcom-pm8xxx-rtc.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: rtc@6000 (qcom,pm8941-rtc): 'reg-names' does not match any of the regexes: '^pinctrl-[0-9]+$'
-	from schema $id: http://devicetree.org/schemas/rtc/qcom-pm8xxx-rtc.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): compatible:0: 'qcom,msm8953-dwc3' is not one of ['qcom,msm8996-dwc3', 'qcom,msm8998-dwc3', 'qcom,sc7180-dwc3', 'qcom,sc7280-dwc3', 'qcom,sdm660-dwc3', 'qcom,sdm845-dwc3', 'qcom,sdx55-dwc3', 'qcom,sm4250-dwc3', 'qcom,sm6115-dwc3', 'qcom,sm8150-dwc3', 'qcom,sm8250-dwc3', 'qcom,sm8350-dwc3']
-	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): clock-names:3: 'mock_utmi' was expected
-	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): clock-names:4: 'sleep' was expected
-	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): interrupts: [[0, 136, 4], [0, 220, 4]] is too short
-	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@70f8800 (qcom,msm8953-dwc3): interrupt-names: ['hs_phy_irq', 'ss_phy_irq'] is too short
-	from schema $id: http://devicetree.org/schemas/usb/qcom,dwc3.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: usb@7000000 (snps,dwc3): phy_mode: b'utmi\x00' is not of type 'object', 'integer', 'array', 'boolean', 'null'
-	from schema $id: http://devicetree.org/schemas/dt-core.yaml
-/home/runner/work/_temp/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb: mailbox@b011000 (qcom,msm8953-apcs-kpss-global): compatible: ['qcom,msm8953-apcs-kpss-global', 'syscon'] is too long
-	from schema $id: http://devicetree.org/schemas/mailbox/qcom,apcs-kpss-global.yaml
+## Last dt-mk-schema log lines
+
+## Last targeted dt-validate log lines
+preprocessed schema file is not valid JSON or YAML
+
+Traceback (most recent call last):
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/dtschema/validator.py", line 349, in __init__
+    schema_cache = json.load(f)
+                   ^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/runner/work/_temp/dtschema-venv/bin/dt-validate", line 8, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/dtschema/dtb_validate.py", line 127, in main
+    sg = schema_group(args.schema)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/dtschema/dtb_validate.py", line 23, in __init__
+    self.validator = dtschema.DTValidator([schema_file])
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/dtschema/validator.py", line 354, in __init__
+    schema_cache = yaml.load(f.read())
+                   ^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/main.py", line 454, in load
+    return constructor.get_single_data()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/constructor.py", line 117, in get_single_data
+    node = self.composer.get_single_node()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/composer.py", line 77, in get_single_node
+    document = self.compose_document()
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/composer.py", line 100, in compose_document
+    node = self.compose_node(None, None)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/composer.py", line 144, in compose_node
+    node = self.compose_mapping_node(anchor)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/composer.py", line 220, in compose_mapping_node
+    while not self.parser.check_event(MappingEndEvent):
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/parser.py", line 141, in check_event
+    self.current_event = self.state()
+                         ^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/parser.py", line 600, in parse_block_mapping_key
+    if self.scanner.check_token(KeyToken):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/scanner.py", line 170, in check_token
+    self.fetch_more_tokens()
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/scanner.py", line 278, in fetch_more_tokens
+    return self.fetch_value()
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/scanner.py", line 628, in fetch_value
+    raise ScannerError(
+ruamel.yaml.scanner.ScannerError: mapping values are not allowed here
+  in "<unicode string>", line 1, column 112:
+     ... omap.yaml: rs485-rts-active-high: missing type definition
+                                         ^ (line: 1)
+
+## Last backported rpmpd object build log lines
+  HDRINST usr/include/asm/setup.h
+  HDRINST usr/include/asm/byteorder.h
+  HDRINST usr/include/asm/hwcap.h
+  HDRINST usr/include/asm/auxvec.h
+  HDRINST usr/include/asm/kvm.h
+  HDRINST usr/include/asm/param.h
+  HDRINST usr/include/asm/ptrace.h
+  HDRINST usr/include/asm/bpf_perf_event.h
+  HDRINST usr/include/asm/unistd.h
+  HDRINST usr/include/asm/sve_context.h
+  HDRINST usr/include/asm/signal.h
+  HDRINST usr/include/asm/fcntl.h
+  HDRINST usr/include/asm/bitsperlong.h
+  HDRINST usr/include/asm/shmbuf.h
+  HDRINST usr/include/asm/msgbuf.h
+  HDRINST usr/include/asm/resource.h
+  HDRINST usr/include/asm/swab.h
+  HDRINST usr/include/asm/types.h
+  HDRINST usr/include/asm/kvm_para.h
+  HDRINST usr/include/asm/ioctl.h
+  HOSTCC  scripts/sorttable
+  HDRINST usr/include/asm/ioctls.h
+  HDRINST usr/include/asm/errno.h
+  HDRINST usr/include/asm/termios.h
+  HDRINST usr/include/asm/sockios.h
+  HDRINST usr/include/asm/siginfo.h
+  HDRINST usr/include/asm/stat.h
+  HDRINST usr/include/asm/termbits.h
+  HDRINST usr/include/asm/poll.h
+  HDRINST usr/include/asm/ipcbuf.h
+  HDRINST usr/include/asm/socket.h
+  HDRINST usr/include/asm/sembuf.h
+  HOSTCC  scripts/asn1_compiler
+  HOSTCC  scripts/sign-file
+  HOSTCC  scripts/extract-cert
+  GEN     arch/arm64/include/generated/asm/cpucaps.h
+  CC      scripts/mod/empty.o
+  HOSTCC  scripts/mod/mk_elfconfig
+  CC      scripts/mod/devicetable-offsets.s
+  MKELF   scripts/mod/elfconfig.h
+  HOSTCC  scripts/mod/modpost.o
+  HOSTCC  scripts/mod/sumversion.o
+  UPD     scripts/mod/devicetable-offsets.h
+  HOSTCC  scripts/mod/file2alias.o
+  HOSTLD  scripts/mod/modpost
+  CC      kernel/bounds.s
+  UPD     include/generated/timeconst.h
+  CALL    /home/runner/work/_temp/deen-src/scripts/atomic/check-atomics.sh
+  UPD     include/generated/bounds.h
+  CC      arch/arm64/kernel/asm-offsets.s
+  UPD     include/generated/asm-offsets.h
+  CALL    /home/runner/work/_temp/deen-src/scripts/checksyscalls.sh
+  LDS     arch/arm64/kernel/vdso/vdso.lds
+  CC      arch/arm64/kernel/vdso/vgettimeofday.o
+  AS      arch/arm64/kernel/vdso/note.o
+  AS      arch/arm64/kernel/vdso/sigreturn.o
+  LD      arch/arm64/kernel/vdso/vdso.so.dbg
+  VDSOSYM include/generated/vdso-offsets.h
+  OBJCOPY arch/arm64/kernel/vdso/vdso.so
+  LDS     arch/arm64/kernel/vdso32/vdso.lds
+  CC32    arch/arm64/kernel/vdso32/note.o
+  CC32    arch/arm64/kernel/vdso32/vgettimeofday.o
+  HOSTCC  arch/arm64/kernel/vdso32/../../../arm/vdso/vdsomunge
+  LD32    arch/arm64/kernel/vdso32/vdso.so.raw
+  MUNGE   arch/arm64/kernel/vdso32/vdso.so.dbg
+  VDSOSYM include/generated/vdso32-offsets.h
+  OBJCOPY arch/arm64/kernel/vdso32/vdso.so
+  CC      drivers/soc/qcom/rpmpd.o
+make[1]: Leaving directory '/home/runner/work/_temp/deen-out'
+make: Leaving directory '/home/runner/work/_temp/deen-src'
