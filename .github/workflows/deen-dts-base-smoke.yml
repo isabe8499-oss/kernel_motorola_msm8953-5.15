@@ -1,0 +1,182 @@
+name: Deen MSM8953 base DTS compile smoke
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "bootstrap/DEEN_DTS_BASE_SMOKE"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deen-msm8953-base-dts-smoke
+  cancel-in-progress: false
+
+jobs:
+  dts-base-smoke:
+    name: Compile MSM8953 and PM8953 DTSI base
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      SRC: ${{ runner.temp }}/deen-src
+      OUT: ${{ runner.temp }}/deen-out
+    steps:
+      - name: Check out project control branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install device-tree build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libelf-dev libncurses-dev libssl-dev \
+            python3 python3-dev dwarves binutils-aarch64-linux-gnu \
+            clang-18 lld-18 llvm-18
+
+      - name: Fetch clean Deen DTS bring-up branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin \
+            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup
+          git worktree add --detach "$SRC" refs/remotes/origin/deen/dts-bringup
+          git -C "$SRC" rev-parse HEAD
+
+      - name: Compile a generated MSM8953 and PM8953 base-only DTS fixture
+        id: dts-smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 gki_defconfig
+
+          "$SRC/scripts/config" --file "$OUT/.config" --enable ARCH_QCOM
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
+          grep -qx "CONFIG_ARCH_QCOM=y" "$OUT/.config"
+
+          cat > "$SRC/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dts" <<'EOF'
+          /dts-v1/;
+
+          #include "msm8953.dtsi"
+          #include "pm8953.dtsi"
+
+          / {
+              model = "MSM8953 Deen base DTS syntax smoke (not for device use)";
+              compatible = "qcom,msm8953";
+          };
+          EOF
+
+          printf '\n# Runtime-generated CI-only DTS syntax fixture; not a device DTB.\ndtb-$(CONFIG_ARCH_QCOM) += msm8953-deen-base-smoke.dtb\n' \
+            >> "$SRC/arch/arm64/boot/dts/qcom/Makefile"
+
+          set +e
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 \
+            qcom/msm8953-deen-base-smoke.dtb 2>&1 | tee "$RUNNER_TEMP/dts-build.log"
+          DTS_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          DTS_SHA="not-built"
+          DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb"
+          if [[ "$DTS_STATUS" -eq 0 && -s "$DTB" ]]; then
+            DTS_SHA="$(sha256sum "$DTB" | awk '{print $1}')"
+          else
+            DTS_STATUS=1
+          fi
+
+          BRANCH_SHA="$(git -C "$SRC" rev-parse HEAD)"
+          CLANG_VERSION="$(clang-18 --version | head -n 1)"
+          RESULT="PASS"
+          if [[ "$DTS_STATUS" -ne 0 ]]; then RESULT="FAIL"; fi
+
+          {
+            echo "# Deen MSM8953/PM8953 base DTS compile smoke"
+            echo
+            echo "- Result: $RESULT"
+            echo "- Branch: deen/dts-bringup"
+            echo "- Branch commit: $BRANCH_SHA"
+            echo "- SoC DTSI source: Linux v6.1, blob 6b992a6d56c16d5151785df04fa2053c67ee7fad"
+            echo "- PMIC DTSI source: Linux v6.1, blob a1d36f9ebbd259e41a80e3af516d9a044419afe0"
+            echo "- ACK base: Android Common Kernel 5.15 LTS"
+            echo "- Compiler: $CLANG_VERSION"
+            echo "- Test: generated minimal DTS includes msm8953.dtsi and pm8953.dtsi"
+            echo "- DTB SHA-256: $DTS_SHA"
+            echo
+            echo "This is only a base-DTS syntax/include smoke test. It has no Deen PVT board ID or peripheral enablement and is not a flashable device tree."
+          } > "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md"
+
+          if [[ "$DTS_STATUS" -ne 0 ]]; then
+            {
+              echo
+              echo "## Last build log lines"
+              tail -n 100 "$RUNNER_TEMP/dts-build.log"
+            } >> "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md"
+          fi
+
+          cat "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "exit_code=$DTS_STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Upload DTS smoke log and generated DTB
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-msm8953-base-dts-smoke
+          path: |
+            ${{ runner.temp }}/DEEN_DTS_BASE_SMOKE.md
+            ${{ runner.temp }}/dts-build.log
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb
+            ${{ runner.temp }}/deen-out/.config
+          if-no-files-found: warn
+
+      - name: Publish DTS smoke report to main
+        if: always() && steps.dts-smoke.outputs.exit_code != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMITTED=0
+          for ATTEMPT in 1 2 3 4 5; do
+            git fetch origin main
+            git switch -C main origin/main
+            cp "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md" documentation/DEEN_DTS_BASE_SMOKE.md
+            git add documentation/DEEN_DTS_BASE_SMOKE.md
+            if git diff --cached --quiet; then
+              COMMITTED=1
+              break
+            fi
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "ci: record Deen MSM8953 base DTS smoke result"
+            if git push origin HEAD:refs/heads/main; then
+              COMMITTED=1
+              break
+            fi
+            echo "main advanced during report publication; retrying."
+            sleep 3
+          done
+          test "$COMMITTED" -eq 1
+
+      - name: Fail workflow if the DTS compile did not pass
+        if: steps.dts-smoke.outputs.exit_code != '0'
+        shell: bash
+        run: exit 1
