@@ -149,9 +149,19 @@ jobs:
           cat "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish validation report to main
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -s "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" ]]; then
+            {
+              echo "# ACK Android 14 5.15 base configuration smoke"
+              echo
+              echo "- Result: FAIL / INCOMPLETE"
+              echo "- Pinned source SHA: $ACK_SHA"
+              echo "- The workflow did not reach the smoke-report stage. Inspect this run's earlier steps for the first failure."
+            } > "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md"
+          fi
           COMMITTED=0
           for ATTEMPT in 1 2 3 4 5; do
             git fetch origin main
