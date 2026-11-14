@@ -42,6 +42,9 @@ jobs:
             exit 1
           }
           git cat-file -e "$ACK_SHA^{commit}"
+          echo "Running full object/connectivity integrity check on the fetched ACK history."
+          git fsck --full --no-reflogs --no-progress "$ACK_SHA"
+          echo "ACK object integrity check passed."
           echo "ack_sha=$ACK_SHA" >> "$GITHUB_OUTPUT"
           echo "Disk after fetch:"
           df -h .
