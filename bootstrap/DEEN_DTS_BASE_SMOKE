@@ -2,4 +2,4 @@
 
 Compile a runtime-generated minimal DTS that includes the imported Linux v6.1 msm8953.dtsi and pm8953.dtsi against the clean ACK 5.15 branch deen/dts-bringup. The fixture is CI-only and must never be used as a flashable Deen DTB.
 
-Trigger request: 2026-11-14T15:05:00-03:00. Re-run the compiled DTB property audit with non-fatal fdtget capture and explicit status codes.
+Trigger request: 2026-11-14T15:10:00-03:00. Re-run after correcting fdtget exit-code capture for board IDs and QSEE region.
