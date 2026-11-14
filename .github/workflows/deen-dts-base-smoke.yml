@@ -51,7 +51,7 @@ jobs:
           set -euo pipefail
           SRC="$RUNNER_TEMP/deen-src"
           git fetch --no-tags --depth=1 origin \
-            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup"
+            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup
           git worktree add --detach "$SRC" refs/remotes/origin/deen/dts-bringup
           git -C "$SRC" rev-parse HEAD
 
