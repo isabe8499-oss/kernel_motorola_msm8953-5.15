@@ -107,26 +107,25 @@ jobs:
           DTS_STATUS=${PIPESTATUS[0]}
           set -e
 
+          BASE_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb"
+          PVT1_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          PVT2_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+
           set +e
-          make -C "$SRC" O="$OUT" ARCH=arm64 \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
-            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
-            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
-            HOSTCC=clang-18 HOSTCXX=clang++-18 \
-            DT_SCHEMA_FILES=Documentation/devicetree/bindings/arm/qcom.yaml \
-            dt_binding_check 2>&1 | tee "$RUNNER_TEMP/dt-binding-check.log"
+          dt-doc-validate "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
+            2>&1 | tee "$RUNNER_TEMP/dt-binding-check.log"
           BINDING_STATUS=${PIPESTATUS[0]}
 
-          make -C "$SRC" O="$OUT" ARCH=arm64 \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
-            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
-            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
-            HOSTCC=clang-18 HOSTCXX=clang++-18 \
-            DT_SCHEMA_FILES=Documentation/devicetree/bindings/arm/qcom.yaml \
-            dtbs_check 2>&1 | tee "$RUNNER_TEMP/dtbs-check.log"
-          DTBS_STATUS=${PIPESTATUS[0]}
+          if [[ "$DTS_STATUS" -eq 0 && -s "$BASE_DTB" && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
+            dt-validate -s "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
+              "$BASE_DTB" "$PVT1_DTB" "$PVT2_DTB" \
+              2>&1 | tee "$RUNNER_TEMP/dtbs-check.log"
+            DTBS_STATUS=${PIPESTATUS[0]}
+          else
+            echo "Skipping targeted DTB schema validation because one or more DTBs failed to compile." \
+              | tee "$RUNNER_TEMP/dtbs-check.log"
+            DTBS_STATUS=1
+          fi
           set -e
 
           BASE_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb"
