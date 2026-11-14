@@ -19,3 +19,11 @@ These files are being evaluated for a selective backport to ACK 5.15. Do not tre
 - `arch/arm64/boot/dts/qcom/Makefile` declares both DTB targets.
 
 The current board foundation deliberately does not enable the removable SD slot, USB, NFC, display, touchscreen, GPU, camera, audio, WLAN, Bluetooth, fingerprint or other sensors. It is a compile candidate, not a validated device tree. The current PVT in the user's handset remains unknown.
+
+
+## Binding compatibility source
+
+- `Documentation/devicetree/bindings/arm/qcom.yaml` adds the minimal `motorola,deen` + `qcom,msm8953` compatible pair.
+- Upstream source: torvalds/linux commit `51c5d61ba73bde54d7900276cb1c0e37d416adfb` (the original 2026 patch adds `motorola,deen` to the MSM8953 compatible list).
+- The 5.15 binding file predates this SoC/board entry, so the bring-up branch adds only the required schema pair instead of replacing the older complete binding file.
+- A full `dtbs_check`/dt-schema validation is still required.
