@@ -20,3 +20,17 @@
 - Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): c06cc92f0487675277588594e03c1ad49eb5e69ff43ae7924bec2f50cb371055
 
 This is a minimal Deen board-DTS compile/schema smoke test. PVT1/PVT2 wrappers include board IDs 0x4D 0xC100/0xC200. Shared nodes cover QSEE reservation, PM8953 RPM regulators, volume keys and primary eMMC only. Display, touch, GPU, camera, audio, USB, NFC, WLAN, Bluetooth, fingerprint, sensors, modem/remote processors and SDHC2 are not enabled. The handset PVT is unknown; this is not a complete or flashable device tree.
+
+## Schema diagnostics — follow-up audit (2026-11-14)
+
+Although `dt-doc-validate`, processed-schema generation and `dt-validate` returned exit code 0 in CI run 43623081943, the job log contains 160 diagnostic lines for the two PVT DTBs. Examples include cache-level/cache-unified omissions, memory-node schema mismatch, pinctrl child requirements, SPMI/RTC reg shape, MSM8953 USB compatible/interrupt requirements and APCS mailbox compatible constraints. Therefore the schema check is NOT accepted as a clean pass.
+
+The evidence points to a schema provenance mismatch that must be investigated: the imported SoC/PMIC DTSI sources are Linux v6.1, while the validation schema directory comes from the pinned ACK 5.15 tree. Some nodes in the imported full SoC description are not yet reconciled with the older schema set. The diagnostics must be triaged by node and binding; do not silence them globally or infer that they are harmless simply because the validator process returned zero.
+
+Current acceptance:
+- DTS syntax compilation: PASS.
+- Compiled PVT board-ID read-back: PASS.
+- QSEE reservation and deleted-overlap read-back: PASS.
+- Binding document syntax validation: PASS.
+- Full-tree PVT schema validation: HOLD pending schema-version reconciliation and diagnostic triage.
+- No hardware boot or flash approval.
