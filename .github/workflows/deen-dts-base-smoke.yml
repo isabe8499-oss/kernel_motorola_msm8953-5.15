@@ -150,10 +150,24 @@ jobs:
           if-no-files-found: warn
 
       - name: Publish DTS smoke report to main
-        if: always() && steps.dts-smoke.outputs.exit_code != ''
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -s "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md" ]]; then
+            {
+              echo "# Deen MSM8953/PM8953 base DTS compile smoke"
+              echo
+              echo "- Result: FAIL / INCOMPLETE"
+              echo "- Branch: deen/dts-bringup"
+              echo "- The workflow did not reach the DTS report stage. Inspect this run's earlier steps for the first failure."
+              if [[ -s "$RUNNER_TEMP/dts-build.log" ]]; then
+                echo
+                echo "## Last build log lines"
+                tail -n 100 "$RUNNER_TEMP/dts-build.log"
+              fi
+            } > "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md"
+          fi
           COMMITTED=0
           for ATTEMPT in 1 2 3 4 5; do
             git fetch origin main
