@@ -1,0 +1,190 @@
+name: ACK Android 14 5.15 base configuration and object smoke
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "bootstrap/ACK_CONFIG_SMOKE"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ack-android14-515-config-smoke
+  cancel-in-progress: false
+
+jobs:
+  config-and-object-smoke:
+    name: Validate pinned ACK config and MSM8953 driver objects
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      ACK_SHA: 5cb316cf9d39318326075731e4e0c39b725d9c99
+      ACK_URL: https://android.googlesource.com/kernel/common.git
+      ACK_BRANCH: android14-5.15-lts
+      ARCH: arm64
+      CROSS_COMPILE: aarch64-linux-gnu-
+      OUT: ${{ runner.temp }}/ack-out
+      SRC: ${{ runner.temp }}/ack-src
+
+    steps:
+      - name: Check out project control branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Install pinned LLVM 18 build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libelf-dev libncurses-dev libssl-dev \
+            python3 python3-dev dwarves binutils-aarch64-linux-gnu \
+            clang-18 lld-18 llvm-18
+
+      - name: Fetch and verify the exact ACK source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$SRC"
+          git -C "$SRC" remote add origin "$ACK_URL"
+          git -C "$SRC" -c protocol.version=2 fetch --depth=1 --no-tags origin \
+            "+refs/heads/$ACK_BRANCH:refs/remotes/ack/$ACK_BRANCH"
+          FETCHED="$(git -C "$SRC" rev-parse "refs/remotes/ack/$ACK_BRANCH")"
+          echo "Fetched ACK SHA: $FETCHED"
+          test "$FETCHED" = "$ACK_SHA" || {
+            echo "::error::ACK branch moved; pinned source no longer matches. Refusing an unreviewed build."
+            exit 1
+          }
+          git -C "$SRC" checkout --detach "$ACK_SHA"
+          test "$(git -C "$SRC" rev-parse HEAD)" = "$ACK_SHA"
+
+      - name: Generate GKI base configuration and enable MSM8953 platform drivers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT"
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 gki_defconfig
+
+          "$SRC/scripts/config" --file "$OUT/.config" \
+            --enable ARCH_QCOM \
+            --enable COMMON_CLK_QCOM \
+            --enable MSM_GCC_8953 \
+            --enable PINCTRL_MSM \
+            --enable PINCTRL_MSM8953
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
+
+          for SYMBOL in ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953; do
+            grep -qx "CONFIG_${SYMBOL}=y" "$OUT/.config" || {
+              echo "::error::Kconfig dependency resolution did not retain CONFIG_${SYMBOL}=y"
+              exit 1
+            }
+          done
+
+      - name: Compile ACK MSM8953 GCC and pinctrl objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE="$CROSS_COMPILE" \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 -j2 \
+            drivers/clk/qcom/gcc-msm8953.o \
+            drivers/pinctrl/qcom/pinctrl-msm8953.o
+
+          test -s "$OUT/drivers/clk/qcom/gcc-msm8953.o"
+          test -s "$OUT/drivers/pinctrl/qcom/pinctrl-msm8953.o"
+          sha256sum \
+            "$OUT/drivers/clk/qcom/gcc-msm8953.o" \
+            "$OUT/drivers/pinctrl/qcom/pinctrl-msm8953.o" \
+            > "$RUNNER_TEMP/ACK_OBJECT_SHA256SUMS"
+
+      - name: Write smoke-test report
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLANG_VERSION="$(clang-18 --version | head -n 1)"
+          LLD_VERSION="$(ld.lld-18 --version | head -n 1)"
+          CONFIG_SHA="$(sha256sum "$OUT/.config" | awk '{print $1}')"
+          OBJECT_HASHES="$(cat "$RUNNER_TEMP/ACK_OBJECT_SHA256SUMS")"
+
+          cat > "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" <<EOF
+          # ACK Android 14 5.15 base configuration smoke
+
+          - Result: PASS
+          - ACK repository: $ACK_URL
+          - Branch: $ACK_BRANCH
+          - Pinned source SHA: $ACK_SHA
+          - Architecture: arm64
+          - Base configuration: gki_defconfig followed by olddefconfig
+          - Required resolved symbols: ARCH_QCOM, COMMON_CLK_QCOM, MSM_GCC_8953, PINCTRL_MSM, PINCTRL_MSM8953 (all y)
+          - Clang: $CLANG_VERSION
+          - LLD: $LLD_VERSION
+          - Resolved .config SHA-256: $CONFIG_SHA
+
+          ## Compiled object hashes
+
+          ```text
+          $OBJECT_HASHES
+          ```
+
+          This is a configuration and two-object compile smoke test only. It is not a full Image/DTB build, Deen device build, ABI validation or boot test.
+          EOF
+
+          cat "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish validation report to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          COMMITTED=0
+          for ATTEMPT in 1 2 3 4 5; do
+            git fetch origin main
+            git switch -C main origin/main
+            cp "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" documentation/ACK_BASE_CONFIG_SMOKE.md
+            cp "$OUT/.config" "$RUNNER_TEMP/ACK_GKI_CONFIG"
+            git add documentation/ACK_BASE_CONFIG_SMOKE.md
+            if git diff --cached --quiet; then
+              COMMITTED=1
+              break
+            fi
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "ci: record ACK MSM8953 config and object smoke"
+            if git push origin HEAD:refs/heads/main; then
+              COMMITTED=1
+              break
+            fi
+            echo "main advanced during report publication; retrying from latest main."
+            sleep 3
+          done
+          test "$COMMITTED" -eq 1
+
+      - name: Upload resolved configuration and object hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: ack-android14-515-config-smoke
+          path: |
+            ${{ runner.temp }}/ACK_BASE_CONFIG_SMOKE.md
+            ${{ runner.temp }}/ACK_OBJECT_SHA256SUMS
+            ${{ runner.temp }}/ack-out/.config
+            ${{ runner.temp }}/ack-out/drivers/clk/qcom/gcc-msm8953.o
+            ${{ runner.temp }}/ack-out/drivers/pinctrl/qcom/pinctrl-msm8953.o
+          if-no-files-found: error
