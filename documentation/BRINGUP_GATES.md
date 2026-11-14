@@ -44,7 +44,7 @@ The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qua
 
 ## Gate D — full kernel Image link: RUNNING / NOT YET APPROVED
 
-Workflow: Deen ACK 5.15 full Image and DTB compile smoke.
+Run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (currently step 6: full build).
 
 It uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image. The report is documentation/DEEN_IMAGE_SMOKE.md once the job completes.
 
