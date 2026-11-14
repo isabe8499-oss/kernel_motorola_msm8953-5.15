@@ -4,7 +4,7 @@ Status values: **Present** = implementation exists in pinned ACK; **Gap** = devi
 
 | Area | 4.19 donor evidence | Pinned ACK 5.15 evidence / gap | Priority |
 |---|---|---|---|
-| SoC / machine | `ARCH_MSM8953`, Deen PVT1/PVT2 support | Qualcomm platform framework is present, but no MSM8953/Deen DTS integration in the pinned ACK. | P0 |
+| SoC / machine | `ARCH_MSM8953`, Deen PVT1/PVT2 support | The pinned ACK has the Qualcomm framework; a minimal Deen DTS foundation now lives on `deen/dts-bringup`. No Deen-specific defconfig or runtime board validation exists yet. | P0 |
 | Base Device Tree | Vendor `msm8953.dtsi`, `msm8953-pinctrl.dtsi`, PMIC fragments | Pinned ACK lacked the base. Unchanged v6.1 `msm8953.dtsi` and `pm8953.dtsi` now exist on `deen/dts-bringup`; the SoC DTSI already defines TLMM, UART, SPMI, RPM and SDHC nodes. No separate pinctrl DTSI is currently needed for this base. CI run 43620086484 compiled base fixture plus PVT1/PVT2 candidates and passed targeted dt-schema validation. Hardware use remains unverified. | P0 |
 | Deen DTS / DTB | PVT1/PVT2 DTS + modular Deen fragments; board IDs C100/C200 | No Deen DTB target existed in ACK. PVT1/PVT2 wrappers now exist on `deen/dts-bringup`; each has its distinct board ID, and both compile plus pass targeted schema validation. The handset's actual PVT is still unknown. | P0 |
 | Clocks / reset | Deen GCC, RPM clocks and reset references | MSM8953 GCC driver, Kconfig and Makefile wiring exist. Audit clock IDs, resets, parents and DT references. | P0 |
