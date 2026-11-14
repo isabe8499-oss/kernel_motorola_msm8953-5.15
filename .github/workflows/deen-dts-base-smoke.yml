@@ -112,12 +112,14 @@ jobs:
           PVT2_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
 
           set +e
-          dt-doc-validate "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
+          dt-doc-validate \
+            "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
+            "$SRC/Documentation/devicetree/bindings/power/qcom,rpmpd.yaml" \
             2>&1 | tee "$RUNNER_TEMP/dt-binding-check.log"
           BINDING_STATUS=${PIPESTATUS[0]}
 
           if [[ "$DTS_STATUS" -eq 0 && -s "$BASE_DTB" && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
-            dt-validate -s "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
+            dt-validate -s "$SRC/Documentation/devicetree/bindings" \
               "$BASE_DTB" "$PVT1_DTB" "$PVT2_DTB" \
               2>&1 | tee "$RUNNER_TEMP/dtbs-check.log"
             DTBS_STATUS=${PIPESTATUS[0]}
