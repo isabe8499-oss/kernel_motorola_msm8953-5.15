@@ -162,7 +162,9 @@ jobs:
           BINDING_STATUS=${PIPESTATUS[0]}
 
           if [[ "$DTS_STATUS" -eq 0 && -s "$BASE_DTB" && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
-            "$DTCHEMA_BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" \
+            "$DTCHEMA_BIN/dt-mk-schema" -j \
+              "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
+              "$SRC/Documentation/devicetree/bindings/power/qcom,rpmpd.yaml" \
               > "$RUNNER_TEMP/deen-processed-schema.json" \
               2>&1 | tee "$RUNNER_TEMP/dt-schema-build.log"
             SCHEMA_STATUS=${PIPESTATUS[0]}
