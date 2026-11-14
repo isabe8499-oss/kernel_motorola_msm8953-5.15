@@ -25,7 +25,7 @@ The pinned ACK 5.15 GKI configuration retained the requested MSM8953 GCC/pinctrl
 
 This proves selected Kconfig and object compilation, not a complete kernel link.
 
-## Gate C — Deen DTS syntax and binding smoke: PASS
+## Gate C — Deen DTS syntax and binary read-back: PASS; full-tree schema: HOLD
 
 CI run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43620086484
 
@@ -42,11 +42,11 @@ Evidence and DTB hashes are in documentation/DEEN_DTS_BASE_SMOKE.md; source inve
 
 The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qualcomm ARM binding) were compared with the current deen/dts-bringup branch and are unchanged. Subsequent changes on that branch are documentation-only. A further binary read-back test using fdtget is running in CI run 43623081943; it checks the actual compiled qcom,board-id values, QSEE reg cells and absence of the two replaced memory nodes.
 
-## Gate D — full kernel Image link: RUNNING / NOT YET APPROVED
+## Gate D — full kernel Image link: RETRY QUEUED / NOT YET APPROVED
 
-Run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (currently step 6: full build).
+First attempt: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (attempt 1 failed at the runner level with exit 143 and a shutdown signal during LTO `vmlinux.o`; no compiler diagnostic or artifact was produced). The failed job was re-queued as attempt 2; verify its result before changing kernel source.
 
-It uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image. The report is documentation/DEEN_IMAGE_SMOKE.md once the job completes.
+It uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image.
 
 ## Gate E — identify actual handset hardware revision: BLOCKED ON DEVICE EVIDENCE
 
