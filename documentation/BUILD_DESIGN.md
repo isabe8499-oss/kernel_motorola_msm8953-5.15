@@ -14,7 +14,7 @@
 2. **ACK config/object smoke — PASS:** gki_defconfig, olddefconfig, 10 MSM8953/PMIC/SPMI/RPM/SDHCI/GPIO-key objects compiled using Clang/LLD 18. See `ACK_BASE_CONFIG_SMOKE.md`.
 3. **DTS validation — compile/schema PASS:** CI run 43620086484 compiled the synthetic base fixture and both PVT1/PVT2 candidates; `dt-doc-validate`, schema generation and targeted `dt-validate` passed. This is not a boot or runtime test.
 4. **SoC/board validation:** add storage, regulators, clocks, pinctrl, thermal and serial console in a dependency-ordered way.
-5. **Kernel build:** build Image and required modules/DTBs with pinned LLVM/Clang and complete artifacts.
+5. **Kernel build — current gate:** CI run 43621721595 is linking the full arm64 Image with generic GKI configuration plus MSM8953 platform options and both PVT candidate DTBs. It is not yet the final Deen defconfig.
 6. **Boot integration:** disabled until the target ROM's boot/vendor_boot/dtbo layout is measured and the rollback path is tested.
 
 ## Toolchain
@@ -30,5 +30,5 @@ GitHub-hosted standard runners may not have sufficient disk or time for repeated
 - Full ACK source history: imported and integrity-verified.
 - MSM8953 GCC and pinctrl drivers: present in ACK and targeted by the object smoke.
 - Deen base/board DTSI and PVT1/PVT2 candidates: compiled and schema-validated in CI; actual board revision, runtime behavior and flash packaging remain unverified.
-- Deen defconfig, Image, DTB/DTBO, modules and boot image: not yet created.
+- Deen defconfig, DTBO and boot image: not yet created. A generic GKI Image smoke is currently running; it must pass before the Deen-specific defconfig stage.
 - No device flashing is authorized before the boot layout, correct PVT board ID and rollback path are recorded.
