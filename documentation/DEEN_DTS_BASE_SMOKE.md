@@ -2,7 +2,7 @@
 
 - Result: FAIL
 - Branch: deen/dts-bringup
-- Branch commit: 22c973d699252404ea0fdb1fb8cebf01abb0736e
+- Branch commit: 06e98fd1484cd28819e7fc22bf9eca8e5e6bf657
 - SoC DTSI source: Linux v6.1, blob 6b992a6d56c16d5151785df04fa2053c67ee7fad
 - PMIC DTSI source: Linux v6.1, blob a1d36f9ebbd259e41a80e3af516d9a044419afe0
 - ACK base: Android Common Kernel 5.15 LTS
@@ -14,8 +14,8 @@
 - Backported MSM8953 rpmpd.o SHA-256:
   7080ba714a8135cfb7f48c483ed29bfc6d470e1c490ca0afdb186487bedbfe1d  /home/runner/work/_temp/deen-out/drivers/soc/qcom/rpmpd.o
 - Base-only fixture DTB SHA-256: cc6135f44e12cadf1422d817e5d639143bacca0325c582e7cce385864a37da85
-- Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): 6f6cd605790286deebd3dc01ade4d3d774df75eb4e7a7835ec9b883b81b6f1b2
-- Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): aca3ae7df6379a2410b03b03877ca9b014a8d54d14f01327b274e316f5cf5f3b
+- Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): 41a0106d6ade5492497a6736a9c930c82f85fe3c909791968f3f7b0726fe5532
+- Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): c06cc92f0487675277588594e03c1ad49eb5e69ff43ae7924bec2f50cb371055
 
 This is only a base-DTS syntax/include smoke test. It has no Deen PVT board ID or peripheral enablement and is not a flashable device tree.
 
@@ -100,45 +100,45 @@ Traceback (most recent call last):
   File "/home/runner/work/_temp/dtschema-venv/lib/python3.12/site-packages/ruamel/yaml/scanner.py", line 628, in fetch_value
     raise ScannerError(
 ruamel.yaml.scanner.ScannerError: mapping values are not allowed here
-  in "<unicode string>", line 1, column 112:
-     ... omap.yaml: rs485-rts-active-high: missing type definition
+  in "<unicode string>", line 1, column 123:
+     ... c-controller.yaml: wakeup-source: missing type definition
                                          ^ (line: 1)
 
 ## Last backported rpmpd object build log lines
-  HDRINST usr/include/asm/setup.h
-  HDRINST usr/include/asm/byteorder.h
-  HDRINST usr/include/asm/hwcap.h
-  HDRINST usr/include/asm/auxvec.h
+  HDRINST usr/include/asm/sigcontext.h
   HDRINST usr/include/asm/kvm.h
-  HDRINST usr/include/asm/param.h
   HDRINST usr/include/asm/ptrace.h
-  HDRINST usr/include/asm/bpf_perf_event.h
-  HDRINST usr/include/asm/unistd.h
   HDRINST usr/include/asm/sve_context.h
-  HDRINST usr/include/asm/signal.h
   HDRINST usr/include/asm/fcntl.h
+  HDRINST usr/include/asm/perf_regs.h
+  HDRINST usr/include/asm/param.h
   HDRINST usr/include/asm/bitsperlong.h
-  HDRINST usr/include/asm/shmbuf.h
-  HDRINST usr/include/asm/msgbuf.h
-  HDRINST usr/include/asm/resource.h
-  HDRINST usr/include/asm/swab.h
-  HDRINST usr/include/asm/types.h
-  HDRINST usr/include/asm/kvm_para.h
-  HDRINST usr/include/asm/ioctl.h
-  HOSTCC  scripts/sorttable
-  HDRINST usr/include/asm/ioctls.h
-  HDRINST usr/include/asm/errno.h
-  HDRINST usr/include/asm/termios.h
-  HDRINST usr/include/asm/sockios.h
-  HDRINST usr/include/asm/siginfo.h
-  HDRINST usr/include/asm/stat.h
-  HDRINST usr/include/asm/termbits.h
-  HDRINST usr/include/asm/poll.h
-  HDRINST usr/include/asm/ipcbuf.h
+  HDRINST usr/include/asm/hwcap.h
+  HDRINST usr/include/asm/signal.h
+  HDRINST usr/include/asm/posix_types.h
+  HDRINST usr/include/asm/bpf_perf_event.h
+  HDRINST usr/include/asm/ucontext.h
+  HDRINST usr/include/asm/statfs.h
+  HDRINST usr/include/asm/auxvec.h
+  HDRINST usr/include/asm/unistd.h
   HDRINST usr/include/asm/socket.h
+  HDRINST usr/include/asm/siginfo.h
+  HDRINST usr/include/asm/kvm_para.h
+  HDRINST usr/include/asm/termbits.h
+  HDRINST usr/include/asm/errno.h
+  HDRINST usr/include/asm/shmbuf.h
+  HDRINST usr/include/asm/swab.h
+  HDRINST usr/include/asm/poll.h
   HDRINST usr/include/asm/sembuf.h
-  HOSTCC  scripts/asn1_compiler
-  HOSTCC  scripts/sign-file
+  HDRINST usr/include/asm/ioctl.h
+  HDRINST usr/include/asm/resource.h
+  HDRINST usr/include/asm/ipcbuf.h
+  HDRINST usr/include/asm/msgbuf.h
+  HDRINST usr/include/asm/stat.h
+  HDRINST usr/include/asm/sockios.h
+  HDRINST usr/include/asm/types.h
+  HDRINST usr/include/asm/termios.h
+  HDRINST usr/include/asm/ioctls.h
   HOSTCC  scripts/extract-cert
   GEN     arch/arm64/include/generated/asm/cpucaps.h
   CC      scripts/mod/empty.o
