@@ -18,7 +18,7 @@
 ## Gate 2 — Deen hardware identity and boot contract
 
 1. Identify whether the handset uses PVT1 (`0x4D 0xC100`) or PVT2 (`0x4D 0xC200`); do not select a DTB from model name alone.
-2. Record the currently booted Android 12 boot image layout and intended Android 14 ROM's boot/vendor_boot/dtbo format, header version, page size, offsets, cmdline and AVB expectations.
+2. Use documentation/BOOT_CONTRACT_AUDIT.md as a provisional reference, then capture the exact device's boot_a/boot_b, vendor_boot, dtbo, recovery and vbmeta partition inventory and unpack the current Android 12 boot image. Do not rely on old BoardConfig values alone.
 3. Preserve a known-good boot image and tested recovery method before any flash test.
 
 ## Gate 3 — MSM8953 Device Tree foundation
