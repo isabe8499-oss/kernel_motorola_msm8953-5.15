@@ -2,4 +2,4 @@
 
 Compile a runtime-generated minimal DTS that includes the imported Linux v6.1 msm8953.dtsi and pm8953.dtsi against the clean ACK 5.15 branch deen/dts-bringup. The fixture is CI-only and must never be used as a flashable Deen DTB.
 
-Trigger request: 2026-11-14T15:05:00-03:00. Generate the processed schema from the complete bindings directory; keep stderr diagnostics separate from JSON stdout and verify JSON syntax before dt-validate.
+Trigger request: 2026-11-14T14:55:00-03:00. Rebuild both PVT DTBs and inspect compiled qcom,board-id, QSEE reg cells, and absence of inherited overlapping reservations using fdtget.
