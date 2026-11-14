@@ -92,3 +92,19 @@ The two DTSI files are documented as unchanged reference imports from torvalds/l
 The source import is approved. The Deen port is not yet approved for a full kernel build or device flash. The next safe task is Phase A: a controlled 5.15 compatibility audit and build validation of the two SoC/PMIC DTSI reference files on deen/dts-bringup.
 
 No device drivers have been copied into the upstream branch, no donor branch has been modified, and no flashable artifact is claimed.
+
+## 8. Board revision evidence from the clean 4.19 donor
+
+The donor's two board files declare the same compatible chain but distinct board IDs:
+
+- PVT1: qcom,board-id = <0x4D 0xC100>
+- PVT2: qcom,board-id = <0x4D 0xC200>
+
+The donor Makefile builds both DTBs under CONFIG_MACH_MOTOROLA_DEEN. Do not choose one by assumption. The actual XT1941-3 board ID must be read from the device's bootloader/device-tree evidence before selecting a production DTB. Until then, both variants must remain available in the bring-up work.
+
+## 9. Isolated DTSI compile workflow
+
+An experimental GitHub Actions workflow was added on deen/dts-bringup:
+.github/workflows/deen-msm8953-dtsi-validation.yml
+
+It creates a temporary minimal validation board in the runner only and attempts to compile the imported msm8953.dtsi + pm8953.dtsi against the pinned ACK 5.15 tree. It does not commit the temporary test board or modify the production DTS tree. Its run is currently being evaluated; do not mark Phase A passed until the Actions result is successful and the produced DTB is non-empty.
