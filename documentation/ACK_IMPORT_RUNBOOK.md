@@ -5,47 +5,29 @@
 Workflow run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43598636592
 
 Verified from job logs:
-- Checkout completed.
 - Full fetch from `https://android.googlesource.com/kernel/common.git` completed.
 - Fetched revision matched `5cb316cf9d39318326075731e4e0c39b725d9c99`.
 - Disk space after fetch: approximately 83 GiB available.
-- Publication failed during the single large push with `RPC failed; HTTP 500`.
-- Neither permanent destination ref was created.
+- Publication failed during one large push with `RPC failed; HTTP 500`.
 
-The error is consistent with GitHub's documented 2 GiB maximum for one push. GitHub recommends splitting large history imports into smaller sequential pushes. The original import used one push for both refs, which was not safe for this repository's pack size.
+The error was consistent with GitHub's documented 2 GiB maximum for a single push. The import was redesigned to publish chronological first-parent checkpoints, each estimated below a conservative 1.3 GB ceiling.
 
-## Corrected strategy
+## Successful history publication
 
-The revised workflow:
-1. Fetches the same immutable ACK revision and verifies its SHA.
-2. Builds the first-parent chain in chronological order.
-3. Estimates each incremental pack with `git pack-objects --stdout --revs`.
-4. Uses an adaptive checkpoint size, reducing it until the estimated pack is below 1.3 GB.
-5. Pushes each checkpoint to a temporary staging ref. Every checkpoint is a descendant of the previous first-parent checkpoint, so pushes are fast-forward updates and preserve original commit IDs and parent relationships.
-6. Resumes from an existing staging checkpoint if a runner stops mid-import.
-7. Promotes the completed tip to `upstream/android14-5.15-lts` and `deen/bringup-ack515-base`.
-8. Removes the temporary staging ref only after both permanent refs point at the pinned tip.
-9. Writes the exact SHA, checkpoint count and push count into `documentation/ACK_IMPORT_LOCK.md`.
+The corrected import job published 63,852 first-parent commits through 64 increments. The largest estimated pack in the completed run was 458,419,390 bytes. It then created both permanent refs at the pinned SHA and deleted the temporary staging ref.
 
-## Independent post-import verification
+GitHub's compare endpoint returned `identical` for each permanent ref against the pinned source commit. The final workflow also performs:
+- `git fsck --full --no-reflogs` on the fetched source commit.
+- Remote read-back for `upstream/android14-5.15-lts` and `deen/bringup-ack515-base`.
+- A remote query confirming that the temporary staging ref is absent.
+- Publication of `documentation/ACK_IMPORT_LOCK.md` and `documentation/ACK_IMPORT_VERIFICATION.md` only after those gates pass.
 
-The repository also contains `.github/workflows/verify-ack-import.yml`. It is triggered by the completion of this import workflow and independently:
-- Reads both permanent remote refs and requires each to equal the pinned ACK SHA.
-- Fetches both refs back into a clean runner and checks their resolved commit IDs.
-- Requires the temporary staging ref to be absent.
-- Runs `git fsck --full` against the pinned commit.
-- Records first-parent/reachable commit counts and the measured Git object-store size.
+The report file is the machine-readable project gate: Deen porting must remain blocked until it exists and shows PASS.
 
-The source import is not approved for device-port work until this independent verification workflow succeeds.
+## Recovery design
 
-## Safety conditions
+The import workflow is idempotent. If both permanent refs already equal the pinned SHA and staging is absent, it skips history publication and runs the integrity/read-back/documentation steps. If publication stops mid-way, it resumes only from a staging commit on the pinned first-parent chain. It never force-pushes donor or ACK history.
 
-- The workflow refuses to import if upstream branch head differs from the pinned SHA.
-- It refuses to overwrite unexpected existing destination refs.
-- It does not rewrite or force-push any upstream commit.
-- It does not change the 3.18 or 4.19 donor repositories.
-- Completion is not declared until both destination refs are fetched back and verified to point to the exact pinned SHA.
-
-## Source of GitHub's push limit
+## GitHub push-limit reference
 
 https://docs.github.com/en/get-started/using-git/troubleshooting-the-2-gb-push-limit
