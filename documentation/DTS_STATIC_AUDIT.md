@@ -49,7 +49,7 @@ It intentionally does not enable SDHC2, USB, remote processors, NFC, display, to
 1. CI/Kbuild compilation of the synthetic base fixture and both PVT DTBs is pending.
 2. `dt_binding_check` and `dtbs_check` against the updated Qualcomm ARM binding are pending.
 3. Device-side stock DTB/bootloader evidence is required to identify PVT1 vs PVT2.
-4. Memory/reserved-memory, ramoops, TZ log and watchdog context reservations still need a controlled port from the clean donor and validation against the exact firmware memory map.
+4. Deen QSEE memory override is now drafted at 0x84300000/32 MiB; the inherited 0x85b00000 QSEE reservation and 0x90001000 continuous-splash reservation are deleted. The new DTC smoke must validate these overrides and ensure no overlap. Ramoops/TZ log/watchdog memory remains deferred until the exact DRAM map and 5.15 driver bindings are checked.
 5. UART console route must be confirmed before enabling.
 6. The eMMC and PMIC electrical configuration has not been tested on hardware.
 
