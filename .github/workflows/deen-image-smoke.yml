@@ -142,23 +142,56 @@ jobs:
           echo "Disk after configuration:"
           df -h .
 
-      - name: Prepare swap and diagnostics for GKI Full LTO
+      - name: Prepare bounded swap for GKI Full LTO
         shell: bash
         run: |
           set -euo pipefail
           if swapon --show --noheadings | grep -q .; then
             echo "Existing swap detected; preserving runner configuration."
           else
-            sudo fallocate -l 12G /swapfile
-            sudo chmod 600 /swapfile
-            sudo mkswap /swapfile
-            sudo swapon /swapfile
+            AVAILABLE_KB="$(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}')"
+            if (( AVAILABLE_KB >= 10 * 1024 * 1024 )); then
+              SWAP_GIB=4
+            elif (( AVAILABLE_KB >= 8 * 1024 * 1024 )); then
+              SWAP_GIB=2
+            else
+              SWAP_GIB=0
+            fi
+
+            if (( SWAP_GIB > 0 )); then
+              echo "Creating ${SWAP_GIB} GiB swap; retaining at least 6 GiB for build files."
+              sudo fallocate -l "${SWAP_GIB}G" /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+            else
+              echo "Insufficient disk headroom for extra swap; keeping filesystem space for kernel objects."
+            fi
           fi
+
           echo "Memory and swap before Full LTO:"
           free -h
           swapon --show
           echo "Available filesystem space:"
           df -h "$RUNNER_TEMP"
+
+      - name: Serialize LLD link-time work without changing Full LTO or CFI
+        shell: bash
+        run: |
+          set -euo pipefail
+          LINKER_PATH="$RUNNER_TEMP/llvm-bin/ld.lld"
+          REAL_LINKER="$(readlink -f "$LINKER_PATH")"
+          test -x "$REAL_LINKER"
+          "$REAL_LINKER" --help | grep -q -- '--threads'
+          "$REAL_LINKER" --threads=1 --version
+
+          rm -f "$LINKER_PATH"
+          printf '#!/usr/bin/env bash\nexec "%s" --threads=1 "$@"\n' "$REAL_LINKER" > "$LINKER_PATH"
+          chmod 755 "$LINKER_PATH"
+
+          echo "LLD wrapper:"
+          "$LINKER_PATH" --version
+          sha256sum "$REAL_LINKER" "$LINKER_PATH"
 
       - name: Build complete Image and both Deen DTB candidates
         id: build
@@ -169,15 +202,30 @@ jobs:
           OUT="$RUNNER_TEMP/deen-image-out"
           export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
 
+          MEMORY_LOG="$RUNNER_TEMP/deen-full-lto-memory.log"
+          : > "$MEMORY_LOG"
+
           (
             while :; do
-              echo "::group::Full LTO memory telemetry"
-              date -u
-              free -h
-              ps -eo pid,ppid,rss,vsz,%mem,comm --sort=-rss | head -n 12
-              if [[ -r /proc/pressure/memory ]]; then cat /proc/pressure/memory; fi
-              echo "::endgroup::"
-              sleep 60
+              {
+                echo "===== Full LTO memory telemetry $(date -u +%FT%TZ) ====="
+                free -h
+                ps -eo pid,ppid,rss,vsz,%mem,comm --sort=-rss | head -n 12
+                if [[ -r /proc/pressure/memory ]]; then
+                  echo "--- memory PSI ---"
+                  cat /proc/pressure/memory
+                fi
+                if [[ -r /sys/fs/cgroup/memory.events ]]; then
+                  echo "--- cgroup memory.events ---"
+                  cat /sys/fs/cgroup/memory.events
+                fi
+                if [[ -r /proc/vmstat ]]; then
+                  echo "--- swap and OOM counters ---"
+                  awk '/^(pswpin|pswpout|oom_kill|pgmajfault) / {print}' /proc/vmstat
+                fi
+                df -h "$RUNNER_TEMP"
+              } | tee -a "$MEMORY_LOG"
+              sleep 30
             done
           ) &
           MEMORY_MONITOR_PID=$!
@@ -199,6 +247,13 @@ jobs:
           wait "$MEMORY_MONITOR_PID" 2>/dev/null || true
           echo "Memory after build:"
           free -h
+          {
+            echo "===== post-build diagnostics $(date -u +%FT%TZ) ====="
+            if [[ -r /sys/fs/cgroup/memory.events ]]; then cat /sys/fs/cgroup/memory.events; fi
+            if command -v dmesg >/dev/null 2>&1; then
+              sudo dmesg --ctime 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 80 || true
+            fi
+          } | tee -a "$RUNNER_TEMP/deen-full-lto-memory.log"
 
           IMAGE="$OUT/arch/arm64/boot/Image"
           PVT1="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
@@ -227,7 +282,7 @@ jobs:
             echo "- Resolved config SHA-256: ${{ steps.configure.outputs.config_sha }}"
             echo "- Compiler: ${{ steps.configure.outputs.clang_version }}"
             echo "- LTO/CFI: GKI Full LTO and Clang CFI retained"
-            echo "- CI memory mitigation: 12 GiB swap (when no runner swap exists), serial build (-j1), live memory telemetry"
+            echo "- CI memory mitigation: bounded swap based on free disk, serial build (-j1), LLD link threads=1, persistent RAM/swap/PSI/cgroup telemetry"
             echo "- Build target: full arm64 Image plus PVT1 and PVT2 DTBs"
             echo "- PVT1 board ID: 0x4D 0xC100"
             echo "- PVT2 board ID: 0x4D 0xC200"
@@ -256,6 +311,7 @@ jobs:
           path: |
             ${{ runner.temp }}/DEEN_IMAGE_SMOKE.md
             ${{ runner.temp }}/deen-image-build.log
+            ${{ runner.temp }}/deen-full-lto-memory.log
             ${{ runner.temp }}/DEEN_GKI_CONFIG
             ${{ runner.temp }}/DEEN_GKI_CONFIG.sha256
             ${{ runner.temp }}/deen-image-out/.config
