@@ -1,0 +1,8 @@
+# ACK import request
+
+This marker triggers the repository workflow that fetches the full upstream Git history for:
+- Upstream repository: https://android.googlesource.com/kernel/common
+- Branch: android14-5.15-lts
+- Expected immutable commit: 5cb316cf9d39318326075731e4e0c39b725d9c99
+
+The workflow must verify the expected commit before pushing. If upstream advances before the workflow runs, it stops instead of silently importing a different snapshot.
