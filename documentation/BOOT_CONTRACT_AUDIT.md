@@ -52,7 +52,7 @@ Do not package or flash the 5.15 kernel solely from this table. The target AOSPA
 ## Required device-side evidence before packaging
 
 Collect these from the exact XT1941-3 handset and the firmware currently installed:
-1. Output of fastboot getvar all, including current slot, bootloader version and partition information.
+1. Read-only output of `fastboot getvar product`, `fastboot getvar board` and `fastboot getvar hwrev` to establish product and PVT. Do not share full `fastboot getvar all`; it can expose serial number, IMEI and carrier data.
 2. Read-only partition inventory for boot_a/boot_b, vendor_boot_a/vendor_boot_b, dtbo_a/dtbo_b, recovery and vbmeta, showing which actually exist.
 3. Extracted current boot image and its unpacked header version, page size, kernel/ramdisk sizes, cmdline, OS version and header metadata.
 4. Existing DTB/DTBO contents and board compatible/board ID, if present.
