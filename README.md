@@ -4,7 +4,7 @@ Independent clean kernel bring-up for Motorola One Deen (XT1941 series, Qualcomm
 
 ## Project status
 
-**ACK source import and Git object-integrity verification passed. Deen-specific 5.15 bring-up is in preparation; no bootable kernel exists yet.**
+**ACK source import, selected SoC object smoke and Deen DTS/schema smoke passed. A full generic-GKI Image link is now running in CI; no Deen-specific kernel or bootable image exists yet.**
 
 Existing Linux 3.18.140 and 4.19.325 repositories remain read-only donors.
 
@@ -23,7 +23,7 @@ The import traversed 63,852 first-parent commits in 64 pushes. Both permanent re
 
 ACK 5.15 already contains MSM8953 GCC clock, pinctrl, SDHCI, USB HS PHY, remoteproc, SMD RPM and TSENS driver support. The pinned ACK did not contain the MSM8953/PM8953 Device Tree base; unchanged Linux v6.1 copies of `msm8953.dtsi` and `pm8953.dtsi` are now on the isolated `deen/dts-bringup` branch. A minimal Deen board foundation and separate PVT1/PVT2 candidates are present there. CI run 43620086484 compiled the generated base fixture and both board DTBs, passed the Qualcomm ARM/RPM binding checks, and compiled the backported MSM8953 RPM power-domain driver. The current board DTS contains the QSEE 32 MiB reservation, PM8953 RPM rails, volume keys and primary eMMC.
 
-Mainline Linux added an initial Motorola Deen DTS in September 2026. It is a useful reference for generic bindings, but only describes an initial subset of hardware and depends on a much newer MSM8953 DTS than the 5.15 branch. See `documentation/DEEN_MAINLINE_DTS_AUDIT.md` before adding device-tree files. The provisional boot-image contract and device-side evidence gate are documented in `documentation/BOOT_CONTRACT_AUDIT.md`.
+Mainline Linux added an initial Motorola Deen DTS in September 2026. It is a useful reference for generic bindings, but only describes an initial subset of hardware and depends on a much newer MSM8953 DTS than the 5.15 branch. See `documentation/DEEN_MAINLINE_DTS_AUDIT.md` before adding device-tree files. The provisional boot-image contract and device-side evidence gate are documented in `documentation/BOOT_CONTRACT_AUDIT.md`; the no-write engineering gates are consolidated in `documentation/BRINGUP_GATES.md`.
 
 The 4.19 donor has PVT1 and PVT2 DTS variants with board IDs `0x4D 0xC100` and `0x4D 0xC200`. The actual revision in the handset remains to be identified; do not select or flash a DTB based only on XT1941-3.
 
