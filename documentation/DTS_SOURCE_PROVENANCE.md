@@ -42,3 +42,15 @@ This is a focused driver/binding backport. It must be compiled as `drivers/soc/q
 
 
 - `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`: added `qcom,msm8953-rpmpd` to the compatible enum using Linux v6.1 schema semantics. The ACK 5.15 schema predated MSM8953 support.
+
+
+## Deen reserved-memory adaptation
+
+The clean 4.19 donor's `reserved-memory.dtsi` was audited against the current mainline Deen DTS and the Linux v6.1 MSM8953 base:
+- The vendor donor configures QSEE memory at `0x84300000` with a 32 MiB secure region; the current mainline Deen DTS uses the same base and size.
+- The v6.1 SoC DTSI has an inherited anonymous 8 MiB reservation at `0x85b00000`, which falls inside the Deen 32 MiB QSEE range. The Deen common DTSI now deletes that inherited node before adding the Deen QSEE region.
+- The v6.1 base also carries a continuous-splash reservation at `0x90001000` of size `0x13ff000`; the mainline Deen DTS deletes this node for its initial display-disabled support. The Deen common DTSI applies the same deletion.
+- The donor's ramoops area at `0xef000000` (0xC0000 bytes), TZ backup log at `0xeefe4000` (0x2000 bytes), and watchdog CPU-context area at `0xeefe6000` (0x1A000 bytes) are recorded but not yet enabled. TZ-log and watchdog contiguous-region properties are vendor-specific and need matching 5.15 driver/binding support. Ramoops is deferred until its schema and actual DRAM map are checked.
+- The donor's legacy `other_ext_mem` / `qcom_seecom` nodes are not copied; mainline Deen expresses the QSEE reservation directly in `reserved-memory`.
+
+The deletion uses the absolute `/reserved-memory` node reference because the v6.1 source uses anonymous child nodes (unlike newer mainline, which labels them `qseecom_mem` and `cont_splash_mem`). The compile smoke must validate the delete-node syntax and ensure there are no overlapping reservations.
