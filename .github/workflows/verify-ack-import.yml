@@ -1,10 +1,6 @@
 name: Independently verify ACK 5.15 LTS import
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "documentation/ACK_IMPORT_LOCK.md"
   workflow_run:
     workflows:
       - Import full Android Common Kernel 14-5.15 LTS history
