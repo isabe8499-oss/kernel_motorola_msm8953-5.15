@@ -163,11 +163,15 @@ jobs:
 
           if [[ "$DTS_STATUS" -eq 0 && -s "$BASE_DTB" && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
             "$DTCHEMA_BIN/dt-mk-schema" -j \
-              "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
-              "$SRC/Documentation/devicetree/bindings/power/qcom,rpmpd.yaml" \
+              "$SRC/Documentation/devicetree/bindings" \
               > "$RUNNER_TEMP/deen-processed-schema.json" \
-              2>&1 | tee "$RUNNER_TEMP/dt-schema-build.log"
-            SCHEMA_STATUS=${PIPESTATUS[0]}
+              2> "$RUNNER_TEMP/dt-schema-build.log"
+            SCHEMA_STATUS=$?
+            if [[ "$SCHEMA_STATUS" -eq 0 ]]; then
+              python3 -m json.tool "$RUNNER_TEMP/deen-processed-schema.json" \
+                > /dev/null 2> "$RUNNER_TEMP/dt-schema-json-check.log"
+              SCHEMA_STATUS=$?
+            fi
             if [[ "$SCHEMA_STATUS" -eq 0 && -s "$RUNNER_TEMP/deen-processed-schema.json" ]]; then
               "$DTCHEMA_BIN/dt-validate" -s "$RUNNER_TEMP/deen-processed-schema.json" \
                 "$BASE_DTB" "$PVT1_DTB" "$PVT2_DTB" \
@@ -240,8 +244,9 @@ jobs:
               echo "## Last dt-doc-validate log lines"
               if [[ -s "$RUNNER_TEMP/dt-binding-check.log" ]]; then tail -n 70 "$RUNNER_TEMP/dt-binding-check.log"; fi
               echo
-              echo "## Last dt-mk-schema log lines"
+              echo "## Last dt-mk-schema diagnostics"
               if [[ -s "$RUNNER_TEMP/dt-schema-build.log" ]]; then tail -n 70 "$RUNNER_TEMP/dt-schema-build.log"; fi
+              if [[ -s "$RUNNER_TEMP/dt-schema-json-check.log" ]]; then tail -n 30 "$RUNNER_TEMP/dt-schema-json-check.log"; fi
               echo
               echo "## Last targeted dt-validate log lines"
               if [[ -s "$RUNNER_TEMP/dtbs-check.log" ]]; then tail -n 70 "$RUNNER_TEMP/dtbs-check.log"; fi
@@ -265,6 +270,7 @@ jobs:
             ${{ runner.temp }}/dt-binding-check.log
             ${{ runner.temp }}/dtbs-check.log
             ${{ runner.temp }}/dt-schema-build.log
+            ${{ runner.temp }}/dt-schema-json-check.log
             ${{ runner.temp }}/deen-processed-schema.json
             ${{ runner.temp }}/rpmpd-build.log
             ${{ runner.temp }}/rpmpd-object.sha256
