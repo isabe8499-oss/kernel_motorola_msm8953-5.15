@@ -204,7 +204,15 @@ jobs:
               echo "::error::Read-back verification failed for $REF: got '$ACTUAL'."
               exit 1
             fi
-            echo "Verified $REF -> $ACTUAL"
+
+            LOCAL_REF="refs/remotes/verify/${REF#refs/heads/}"
+            git fetch --no-tags origin "$REF:$LOCAL_REF"
+            FETCHED="$(git rev-parse "$LOCAL_REF^{commit}")"
+            if [[ "$FETCHED" != "$ACK_SHA" ]]; then
+              echo "::error::Fetched ref verification failed for $REF: got '$FETCHED'."
+              exit 1
+            fi
+            echo "Verified remote read-back $REF -> $FETCHED"
           done
 
           if [[ "$STAGING_NOW" = "$ACK_SHA" ]]; then
@@ -215,7 +223,8 @@ jobs:
             echo "::error::Temporary staging ref remains after promotion: $STAGING_AFTER"
             exit 1
           fi
-          echo "Both permanent refs match the pinned ACK commit; staging ref is absent."
+          git fsck --full --no-reflogs --no-progress "$ACK_SHA"
+          echo "Both permanent refs were fetched back, match the pinned ACK commit, and pass Git object integrity; staging ref is absent."
 
       - name: Record immutable import metadata
         env:
