@@ -157,29 +157,43 @@ jobs:
           BOARD_ID_STATUS=1
           QSEE_LAYOUT_STATUS=1
           if [[ "$DTS_STATUS" -eq 0 && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
-            PVT1_ID="$(fdtget -t x "$PVT1_DTB" / qcom,board-id | tr '[:upper:]' '[:lower:]')"
-            PVT2_ID="$(fdtget -t x "$PVT2_DTB" / qcom,board-id | tr '[:upper:]' '[:lower:]')"
-            [[ "$PVT1_ID" = "4d c100" ]]
-            [[ "$PVT2_ID" = "4d c200" ]]
+            set +e
+            PVT1_ID="$(fdtget -t x "$PVT1_DTB" / qcom,board-id 2>&1 | tr '[:upper:]' '[:lower:]')"
+            PVT1_RC=${PIPESTATUS[0]}
+            PVT2_ID="$(fdtget -t x "$PVT2_DTB" / qcom,board-id 2>&1 | tr '[:upper:]' '[:lower:]')"
+            PVT2_RC=${PIPESTATUS[0]}
+            QSEE_REG="$(fdtget -t x "$PVT1_DTB" /reserved-memory/qseecom@84300000 reg 2>&1 | tr '[:upper:]' '[:lower:]')"
+            QSEE_RC=${PIPESTATUS[0]}
+            if [[ "$PVT1_RC" -eq 0 && "$PVT2_RC" -eq 0 && "$PVT1_ID" = "4d c100" && "$PVT2_ID" = "4d c200" ]]; then
+              BOARD_ID_STATUS=0
+            else
+              echo "::error::Compiled DTB board-ID read-back mismatch."
+              echo "PVT1 rc=$PVT1_RC value=$PVT1_ID"
+              echo "PVT2 rc=$PVT2_RC value=$PVT2_ID"
+            fi
 
-            QSEE_REG="$(fdtget -t x "$PVT1_DTB" /reserved-memory/qseecom@84300000 reg | tr '[:upper:]' '[:lower:]')"
-            [[ "$QSEE_REG" = "0 84300000 0 2000000" ]]
+            if [[ "$QSEE_RC" -eq 0 && "$QSEE_REG" = "0 84300000 0 2000000" ]]; then
+              QSEE_LAYOUT_STATUS=0
+            else
+              echo "::error::Compiled DTB QSEE region read-back mismatch: rc=$QSEE_RC value=$QSEE_REG"
+            fi
 
             if fdtget -p "$PVT1_DTB" /reserved-memory/memory@85b00000 >/dev/null 2>&1; then
               echo "::error::Overlapping inherited QSEE reservation memory@85b00000 still exists."
-              exit 1
+              QSEE_LAYOUT_STATUS=1
             fi
             if fdtget -p "$PVT1_DTB" /reserved-memory/memory@90001000 >/dev/null 2>&1; then
               echo "::error::Continuous-splash reservation memory@90001000 was not removed."
-              exit 1
+              QSEE_LAYOUT_STATUS=1
             fi
-            BOARD_ID_STATUS=0
-            QSEE_LAYOUT_STATUS=0
-            {
-              echo "PVT1 board ID: $PVT1_ID"
-              echo "PVT2 board ID: $PVT2_ID"
-              echo "QSEE reg cells: $QSEE_REG"
-            } | tee "$RUNNER_TEMP/deen-fdt-readback.log"
+            if [[ "$BOARD_ID_STATUS" -eq 0 && "$QSEE_LAYOUT_STATUS" -eq 0 ]]; then
+              {
+                echo "PVT1 board ID: $PVT1_ID"
+                echo "PVT2 board ID: $PVT2_ID"
+                echo "QSEE reg cells: $QSEE_REG"
+              } > "$RUNNER_TEMP/deen-fdt-readback.log"
+            fi
+            set -e
           fi
 
           set +e
