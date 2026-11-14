@@ -19,11 +19,11 @@ The ACK 5.15 `Documentation/devicetree/bindings/arm/qcom.yaml` predates the MSM8
 
 ## Reserved-memory layout
 
-The Deen common DTSI now moves QSEE to the mainline/donor Deen region at 0x84300000 (32 MiB), deletes the overlapping inherited 0x85b00000 (8 MiB) region and removes the initial continuous-splash reservation at 0x90001000. The complete address/size arithmetic and deferred vendor memory regions are recorded in `documentation/DEEN_MEMORY_LAYOUT_AUDIT.md`. CI run `43620086484` compiled both PVT DTBs with this memory override and the synthetic base fixture; `dt-doc-validate`, processed schema generation and targeted `dt-validate` all returned exit 0.
+The Deen common DTSI now moves QSEE to the mainline/donor Deen region at 0x84300000 (32 MiB), deletes the overlapping inherited 0x85b00000 (8 MiB) region and removes the initial continuous-splash reservation at 0x90001000. The complete address/size arithmetic and deferred vendor memory regions are recorded in `documentation/DEEN_MEMORY_LAYOUT_AUDIT.md`. CI run `43623081943` compiled both PVT DTBs with this memory override and the synthetic base fixture; board-ID and QSEE read-back passed. The validator processes returned exit 0, but 160 schema diagnostic lines remain because the imported v6.1 DTSI is being checked against ACK 5.15 schemas. Full-tree schema acceptance is on HOLD pending binding provenance reconciliation.
 
 ## Power-domain support backport
 
-The v6.1 MSM8953 DTSI references `MSM8953_VDDCX` and a `qcom,msm8953-rpmpd` provider. The ACK 5.15 baseline lacked those seven power-domain IDs and the matching rpmpd driver descriptor. The Deen branch now carries the narrowly scoped v6.1 backport in `include/dt-bindings/power/qcom-rpmpd.h` and `drivers/soc/qcom/rpmpd.c`, plus the `qcom,msm8953-rpmpd` compatible in `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`. The ACK base smoke compiled the upstream `rpmpd.o`; the Deen DTS smoke separately compiled the backported MSM8953 `rpmpd.o` from this branch, and targeted schema validation passed.
+The v6.1 MSM8953 DTSI references `MSM8953_VDDCX` and a `qcom,msm8953-rpmpd` provider. The ACK 5.15 baseline lacked those seven power-domain IDs and the matching rpmpd driver descriptor. The Deen branch now carries the narrowly scoped v6.1 backport in `include/dt-bindings/power/qcom-rpmpd.h` and `drivers/soc/qcom/rpmpd.c`, plus the `qcom,msm8953-rpmpd` compatible in `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`. The ACK base smoke compiled the upstream `rpmpd.o`; the Deen DTS smoke separately compiled the backported MSM8953 `rpmpd.o` from this branch. Binding document syntax passed; full-tree PVT schema validation remains on HOLD pending triage of the 160 diagnostics.
 
 ## Static phandle result
 
@@ -51,7 +51,7 @@ It intentionally does not enable SDHC2, USB, remote processors, NFC, display, to
 
 ## Open blockers
 
-1. A full linked `Image` with the Deen platform config has not yet been built; the next CI gate is a generic GKI `Image` link with MSM8953 options and both DTBs.
+1. A full linked `Image` with the Deen platform config has not yet been built; the generic GKI `Image` link with MSM8953 options was interrupted by runner shutdown (exit 143) during LTO and is queued for retry.
 2. Device-side stock DTB/bootloader evidence is required to identify PVT1 vs PVT2. Do not infer the revision from XT1941-3 alone.
 3. The donor's ramoops/TZ log/watchdog memory remains deferred until the exact DRAM map and matching 5.15 drivers/bindings are audited.
 4. UART console route must be confirmed before enabling.
