@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: deen-ack515-image-smoke
+  group: deen-ack515-image-smoke-lld1
   cancel-in-progress: false
 
 jobs:
@@ -182,7 +182,8 @@ jobs:
           LINKER_PATH="$RUNNER_TEMP/llvm-bin/ld.lld"
           REAL_LINKER="$(readlink -f "$LINKER_PATH")"
           test -x "$REAL_LINKER"
-          "$REAL_LINKER" --help | grep -q -- '--threads'
+          LLD_HELP="$("$REAL_LINKER" --help)"
+          grep -q -- '--threads' <<< "$LLD_HELP"
           "$REAL_LINKER" --threads=1 --version
 
           rm -f "$LINKER_PATH"
