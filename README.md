@@ -23,7 +23,7 @@ The import traversed 63,852 first-parent commits in 64 pushes. Both permanent re
 
 ACK 5.15 already contains MSM8953 GCC clock, pinctrl, SDHCI, USB HS PHY, remoteproc, SMD RPM and TSENS driver support. It does not contain the MSM8953/PM8953/PMI8950 Device Tree base or Deen board DTS.
 
-Mainline Linux added an initial Motorola Deen DTS in September 2026. It is a useful reference for generic bindings, but only describes an initial subset of hardware and depends on a much newer MSM8953 DTS than the 5.15 branch. See `documentation/DEEN_MAINLINE_DTS_AUDIT.md` before adding device-tree files.
+Mainline Linux added an initial Motorola Deen DTS in September 2026. It is a useful reference for generic bindings, but only describes an initial subset of hardware and depends on a much newer MSM8953 DTS than the 5.15 branch. See `documentation/DEEN_MAINLINE_DTS_AUDIT.md` before adding device-tree files. The provisional boot-image contract and device-side evidence gate are documented in `documentation/BOOT_CONTRACT_AUDIT.md`.
 
 The 4.19 donor has PVT1 and PVT2 DTS variants with board IDs `0x4D 0xC100` and `0x4D 0xC200`. The actual revision in the handset remains to be identified; do not select or flash a DTB based only on XT1941-3.
 
