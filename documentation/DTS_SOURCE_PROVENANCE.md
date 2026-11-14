@@ -54,3 +54,8 @@ The clean 4.19 donor's `reserved-memory.dtsi` was audited against the current ma
 - The donor's legacy `other_ext_mem` / `qcom_seecom` nodes are not copied; mainline Deen expresses the QSEE reservation directly in `reserved-memory`.
 
 The deletion uses the absolute `/reserved-memory` node reference because the v6.1 source uses anonymous child nodes (unlike newer mainline, which labels them `qseecom_mem` and `cont_splash_mem`). CI run 43620086484 compiled the resulting DTBs and passed targeted schema validation. The donor ramoops/TZ-log/watchdog reservations remain unported.
+
+
+## CI workflow cleanup
+
+The earlier experimental workflow `.github/workflows/deen-msm8953-dtsi-validation.yml` was retired after the integrated main-branch Deen smoke workflow began compiling the base fixture and both PVT DTBs with pinned Clang 18 and targeted schema validation. The main workflow is the authoritative CI result; the retired GCC/defconfig fixture must not be used as evidence for board readiness.
