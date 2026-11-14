@@ -44,31 +44,42 @@ jobs:
             python3 python3-dev dwarves binutils-aarch64-linux-gnu \
             clang-18 lld-18 llvm-18
 
-      - name: Add LLVM 18 binary directory and aliases required by Kbuild
+      - name: Install and expose LLVM linker tools required by Kbuild
         shell: bash
         run: |
           set -euo pipefail
-          LLVM_BIN="/usr/lib/llvm-18/bin"
-          if [[ ! -x "$LLVM_BIN/ld.lld" ]]; then
-            sudo apt-get install -y --no-install-recommends lld lld-18
+          if ! command -v ld.lld >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends lld
           fi
-          test -x "$LLVM_BIN/ld.lld" || {
-            echo "::error::LLVM 18 linker not found at $LLVM_BIN/ld.lld"
-            find /usr -type f -name 'ld.lld*' -print 2>/dev/null | head -n 20
-            exit 1
-          }
           mkdir -p "$RUNNER_TEMP/llvm-bin"
-          echo "$LLVM_BIN" >> "$GITHUB_PATH"
           for TOOL in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
-            if [[ -x "$LLVM_BIN/$TOOL" ]]; then
-              ln -sf "$LLVM_BIN/$TOOL" "$RUNNER_TEMP/llvm-bin/$TOOL"
-            elif [[ -x "/usr/bin/$TOOL-18" ]]; then
-              ln -sf "/usr/bin/$TOOL-18" "$RUNNER_TEMP/llvm-bin/$TOOL"
+            FOUND=""
+            for CANDIDATE in \
+              "/usr/lib/llvm-18/bin/$TOOL" \
+              "/usr/lib/llvm-19/bin/$TOOL" \
+              "/usr/lib/llvm-20/bin/$TOOL" \
+              "/usr/bin/$TOOL-18" \
+              "/usr/bin/$TOOL-19" \
+              "/usr/bin/$TOOL-20" \
+              "/usr/bin/$TOOL"; do
+              if [[ -x "$CANDIDATE" ]]; then
+                FOUND="$CANDIDATE"
+                break
+              fi
+            done
+            if [[ -n "$FOUND" ]]; then
+              ln -sf "$FOUND" "$RUNNER_TEMP/llvm-bin/$TOOL"
             fi
           done
+          if [[ ! -x "$RUNNER_TEMP/llvm-bin/ld.lld" ]]; then
+            echo "::error::Could not locate an executable LLD linker."
+            ls -la /usr/lib/llvm-*/bin/ld.lld /usr/bin/ld.lld* 2>/dev/null || true
+            exit 1
+          fi
           echo "$RUNNER_TEMP/llvm-bin" >> "$GITHUB_PATH"
           command -v ld.lld
           ld.lld --version
+          clang-18 --version
 
       - name: Fetch and verify the exact ACK source revision
         shell: bash
