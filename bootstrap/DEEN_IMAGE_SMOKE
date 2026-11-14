@@ -5,3 +5,5 @@ Request a full arm64 Image link using GKI defconfig plus MSM8953/QCOM PMIC/eMMC 
 Trigger request: 2026-11-14T14:35:00-03:00.
 
 Retry adjustment (2026-11-14): preserve CONFIG_LTO_CLANG_FULL=y and CONFIG_CFI_CLANG=y, provision 12 GiB swap when the runner has no swap, serialize the compile with -j1, and emit memory-pressure telemetry during the link. This is a CI resource mitigation only; kernel and DTS sources are unchanged.
+
+Follow-up mitigation (2026-11-14): keep CONFIG_LTO_CLANG_FULL=y and CONFIG_CFI_CLANG=y; cap the LLD linker's own worker pool at one thread (the previous -j1 setting only serialized Make jobs); create at most 2–4 GiB swap only when filesystem headroom permits, instead of reserving a fixed 12 GiB; persist 30-second RAM, swap, PSI, cgroup and OOM-counter telemetry as an artifact. The retry uses a separate concurrency group to avoid being blocked by the stale prior run.
