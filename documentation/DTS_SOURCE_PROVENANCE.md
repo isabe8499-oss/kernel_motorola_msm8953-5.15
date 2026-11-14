@@ -1,24 +1,24 @@
 # Deen DTS bring-up source provenance
 
-This branch is a scratch bring-up branch based on the exact ACK 5.15 LTS commit. Its first DTS files are imported unchanged as reference inputs; they are not yet a Deen board description.
+This branch is a controlled Deen board bring-up based on the exact ACK 5.15 LTS commit. It contains unchanged v6.1 SoC/PMIC DTSI sources plus a minimal board-specific DTSI and PVT1/PVT2 wrappers. CI has compiled both candidate DTBs and passed targeted schema validation; the branch is not a complete or bootable Deen tree.
 
 | Destination | Upstream source | Upstream ref | Blob SHA | License |
 |---|---|---|---|---|
 | arch/arm64/boot/dts/qcom/msm8953.dtsi | torvalds/linux | v6.1 | 6b992a6d56c16d5151785df04fa2053c67ee7fad | BSD-3-Clause |
 | arch/arm64/boot/dts/qcom/pm8953.dtsi | torvalds/linux | v6.1 | a1d36f9ebbd259e41a80e3af516d9a044419afe0 | SPDX header retained from upstream |
 
-These files are being evaluated for a selective backport to ACK 5.15. Do not treat this branch as a bootable Deen tree. No vendor peripherals, panel, touchscreen, camera, GPU, board ID, boot image or defconfig has been added.
+These unchanged v6.1 source files provide the SoC/PMIC node base for the Deen port. The board-specific work remains limited to QSEE reservation, PM8953 RPM regulators, volume keys, primary eMMC, and PVT wrappers. Do not treat the branch as a bootable Deen tree.
 
 
 ## Deen board foundation sources
 
-- `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-common.dtsi`: adapted from the upstream Motorola Deen DTS added in commit `b62af30ebdb4ae4ec6230c5e39eea97f65b9f5ea`. The PM8953 SMD regulator values and eMMC supply links are retained from the upstream Deen board description; only the basic volume-key, PMIC regulator and primary eMMC nodes are included at this stage.
+- `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-common.dtsi`: adapted from the upstream Motorola Deen DTS added in commit `b62af30ebdb4ae4ec6230c5e39eea97f65b9f5ea`. The PM8953 SMD regulator values and eMMC supply links are retained from the upstream Deen board description; the QSEE memory region, volume-key, PMIC regulator and primary eMMC nodes are included at this stage.
 - `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts`: PVT1 wrapper with donor board ID `0x4D 0xC100`.
 - `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts`: PVT2 wrapper with donor board ID `0x4D 0xC200`.
 - The two candidate wrappers use the mainline compatible pair `motorola,deen`, `qcom,msm8953`, plus the Motorola donor's `qcom,board-id` value.
 - `arch/arm64/boot/dts/qcom/Makefile` declares both DTB targets.
 
-The current board foundation deliberately does not enable the removable SD slot, USB, NFC, display, touchscreen, GPU, camera, audio, WLAN, Bluetooth, fingerprint or other sensors. It is a compile candidate, not a validated device tree. The current PVT in the user's handset remains unknown.
+The current board foundation deliberately does not enable the removable SD slot, USB, NFC, display, touchscreen, GPU, camera, audio, WLAN, Bluetooth, fingerprint, thermal/battery policy or remote processors. CI run 43620086484 compiled both board candidates and passed targeted schema validation. This does not validate runtime behavior. The current PVT in the handset remains unknown.
 
 
 ## Binding compatibility source
@@ -53,4 +53,4 @@ The clean 4.19 donor's `reserved-memory.dtsi` was audited against the current ma
 - The donor's ramoops area at `0xef000000` (0xC0000 bytes), TZ backup log at `0xeefe4000` (0x2000 bytes), and watchdog CPU-context area at `0xeefe6000` (0x1A000 bytes) are recorded but not yet enabled. TZ-log and watchdog contiguous-region properties are vendor-specific and need matching 5.15 driver/binding support. Ramoops is deferred until its schema and actual DRAM map are checked.
 - The donor's legacy `other_ext_mem` / `qcom_seecom` nodes are not copied; mainline Deen expresses the QSEE reservation directly in `reserved-memory`.
 
-The deletion uses the absolute `/reserved-memory` node reference because the v6.1 source uses anonymous child nodes (unlike newer mainline, which labels them `qseecom_mem` and `cont_splash_mem`). The compile smoke must validate the delete-node syntax and ensure there are no overlapping reservations.
+The deletion uses the absolute `/reserved-memory` node reference because the v6.1 source uses anonymous child nodes (unlike newer mainline, which labels them `qseecom_mem` and `cont_splash_mem`). CI run 43620086484 compiled the resulting DTBs and passed targeted schema validation. The donor ramoops/TZ-log/watchdog reservations remain unported.
