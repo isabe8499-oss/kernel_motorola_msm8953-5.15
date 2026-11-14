@@ -42,7 +42,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/dtschema-venv"
-          "$RUNNER_TEMP/dtschema-venv/bin/pip" install --upgrade pip dtschema
+          "$RUNNER_TEMP/dtschema-venv/bin/pip" install --upgrade pip "dtschema==2024.2"
+          "$RUNNER_TEMP/dtschema-venv/bin/dt-doc-validate" --version
           echo "$RUNNER_TEMP/dtschema-venv/bin" >> "$GITHUB_PATH"
 
       - name: Fetch clean Deen DTS bring-up branch
@@ -62,22 +63,64 @@ jobs:
           set -euo pipefail
           SRC="$RUNNER_TEMP/deen-src"
           OUT="$RUNNER_TEMP/deen-out"
+          DTCHEMA_BIN="$RUNNER_TEMP/dtschema-venv/bin"
           mkdir -p "$OUT"
+
+          # Kbuild's host tools look for generic LLVM names even when clang-18 is selected.
+          mkdir -p "$RUNNER_TEMP/llvm-bin"
+          LLVM_BIN="/usr/lib/llvm-18/bin"
+          for TOOL in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+            FOUND=""
+            for CANDIDATE in "$LLVM_BIN/$TOOL" "/usr/bin/$TOOL-18" "/usr/bin/$TOOL"; do
+              if [[ -x "$CANDIDATE" ]]; then FOUND="$CANDIDATE"; break; fi
+            done
+            if [[ -n "$FOUND" ]]; then ln -sf "$FOUND" "$RUNNER_TEMP/llvm-bin/$TOOL"; fi
+          done
+          if [[ ! -x "$RUNNER_TEMP/llvm-bin/ld.lld" ]]; then
+            sudo apt-get install -y --no-install-recommends lld
+            for CANDIDATE in "/usr/bin/ld.lld-18" "/usr/bin/ld.lld"; do
+              if [[ -x "$CANDIDATE" ]]; then ln -sf "$CANDIDATE" "$RUNNER_TEMP/llvm-bin/ld.lld"; break; fi
+            done
+          fi
+          test -x "$RUNNER_TEMP/llvm-bin/ld.lld"
+          export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
+
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 gki_defconfig
 
-          "$SRC/scripts/config" --file "$OUT/.config" --enable ARCH_QCOM
+          "$SRC/scripts/config" --file "$OUT/.config" \
+            --enable ARCH_QCOM \
+            --enable MAILBOX \
+            --enable RPMSG \
+            --enable COMMON_CLK_QCOM \
+            --enable QCOM_SMD_RPM \
+            --enable QCOM_RPMPD
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
-          grep -qx "CONFIG_ARCH_QCOM=y" "$OUT/.config"
+          for SYMBOL in ARCH_QCOM MAILBOX RPMSG COMMON_CLK_QCOM QCOM_SMD_RPM QCOM_RPMPD; do
+            grep -qx "CONFIG_${SYMBOL}=y" "$OUT/.config" || {
+              echo "::error::Kconfig dropped CONFIG_${SYMBOL}"
+              exit 1
+            }
+          done
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 -j2 \
+            drivers/soc/qcom/rpmpd.o 2>&1 | tee "$RUNNER_TEMP/rpmpd-build.log"
+          test -s "$OUT/drivers/soc/qcom/rpmpd.o"
+          sha256sum "$OUT/drivers/soc/qcom/rpmpd.o" > "$RUNNER_TEMP/rpmpd-object.sha256"
 
           cat > "$SRC/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dts" <<'EOF'
           /dts-v1/;
@@ -97,7 +140,7 @@ jobs:
           set +e
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 \
@@ -112,20 +155,31 @@ jobs:
           PVT2_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
 
           set +e
-          dt-doc-validate \
+          "$DTCHEMA_BIN/dt-doc-validate" \
             "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml" \
             "$SRC/Documentation/devicetree/bindings/power/qcom,rpmpd.yaml" \
             2>&1 | tee "$RUNNER_TEMP/dt-binding-check.log"
           BINDING_STATUS=${PIPESTATUS[0]}
 
           if [[ "$DTS_STATUS" -eq 0 && -s "$BASE_DTB" && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
-            dt-validate -s "$SRC/Documentation/devicetree/bindings" \
-              "$BASE_DTB" "$PVT1_DTB" "$PVT2_DTB" \
-              2>&1 | tee "$RUNNER_TEMP/dtbs-check.log"
-            DTBS_STATUS=${PIPESTATUS[0]}
+            "$DTCHEMA_BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" \
+              > "$RUNNER_TEMP/deen-processed-schema.json" \
+              2>&1 | tee "$RUNNER_TEMP/dt-schema-build.log"
+            SCHEMA_STATUS=${PIPESTATUS[0]}
+            if [[ "$SCHEMA_STATUS" -eq 0 && -s "$RUNNER_TEMP/deen-processed-schema.json" ]]; then
+              "$DTCHEMA_BIN/dt-validate" -s "$RUNNER_TEMP/deen-processed-schema.json" \
+                "$BASE_DTB" "$PVT1_DTB" "$PVT2_DTB" \
+                2>&1 | tee "$RUNNER_TEMP/dtbs-check.log"
+              DTBS_STATUS=${PIPESTATUS[0]}
+            else
+              echo "Could not generate the processed Devicetree schema." \
+                | tee "$RUNNER_TEMP/dtbs-check.log"
+              DTBS_STATUS=1
+            fi
           else
             echo "Skipping targeted DTB schema validation because one or more DTBs failed to compile." \
               | tee "$RUNNER_TEMP/dtbs-check.log"
+            SCHEMA_STATUS=1
             DTBS_STATUS=1
           fi
           set -e
@@ -163,8 +217,11 @@ jobs:
             echo "- ACK base: Android Common Kernel 5.15 LTS"
             echo "- Compiler: $CLANG_VERSION"
             echo "- Test: generated base fixture plus Deen PVT1/PVT2 DTBs"
-            echo "- qcom.yaml dt_binding_check exit: $BINDING_STATUS"
-            echo "- qcom.yaml dtbs_check exit: $DTBS_STATUS"
+            echo "- dt-doc-validate exit: $BINDING_STATUS"
+            echo "- dt-mk-schema exit: ${SCHEMA_STATUS:-not-run}"
+            echo "- targeted dt-validate exit: $DTBS_STATUS"
+            echo "- Backported MSM8953 rpmpd.o SHA-256:"
+            if [[ -s "$RUNNER_TEMP/rpmpd-object.sha256" ]]; then sed 's/^/  /' "$RUNNER_TEMP/rpmpd-object.sha256"; else echo "  not-built"; fi
             echo "- Base-only fixture DTB SHA-256: $BASE_SHA"
             echo "- Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): $PVT1_SHA"
             echo "- Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): $PVT2_SHA"
@@ -178,11 +235,17 @@ jobs:
               echo "## Last DTS compile log lines"
               if [[ -s "$RUNNER_TEMP/dts-build.log" ]]; then tail -n 70 "$RUNNER_TEMP/dts-build.log"; fi
               echo
-              echo "## Last dt_binding_check log lines"
+              echo "## Last dt-doc-validate log lines"
               if [[ -s "$RUNNER_TEMP/dt-binding-check.log" ]]; then tail -n 70 "$RUNNER_TEMP/dt-binding-check.log"; fi
               echo
-              echo "## Last dtbs_check log lines"
+              echo "## Last dt-mk-schema log lines"
+              if [[ -s "$RUNNER_TEMP/dt-schema-build.log" ]]; then tail -n 70 "$RUNNER_TEMP/dt-schema-build.log"; fi
+              echo
+              echo "## Last targeted dt-validate log lines"
               if [[ -s "$RUNNER_TEMP/dtbs-check.log" ]]; then tail -n 70 "$RUNNER_TEMP/dtbs-check.log"; fi
+              echo
+              echo "## Last backported rpmpd object build log lines"
+              if [[ -s "$RUNNER_TEMP/rpmpd-build.log" ]]; then tail -n 70 "$RUNNER_TEMP/rpmpd-build.log"; fi
             } >> "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md"
           fi
 
@@ -199,6 +262,11 @@ jobs:
             ${{ runner.temp }}/dts-build.log
             ${{ runner.temp }}/dt-binding-check.log
             ${{ runner.temp }}/dtbs-check.log
+            ${{ runner.temp }}/dt-schema-build.log
+            ${{ runner.temp }}/deen-processed-schema.json
+            ${{ runner.temp }}/rpmpd-build.log
+            ${{ runner.temp }}/rpmpd-object.sha256
+            ${{ runner.temp }}/deen-out/drivers/soc/qcom/rpmpd.o
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
