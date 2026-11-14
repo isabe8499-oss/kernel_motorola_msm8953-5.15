@@ -104,4 +104,4 @@ These fragments require translation to the ACK/mainline binding model and driver
 5. Keep both donor PVT board IDs until the handset board revision is confirmed.
 6. Add USB/NFC/remote processors after the minimal tree compiles; display/touch, camera, audio and GPU remain separate later workstreams.
 
-No mainline or donor DTS files have been copied into the ACK bring-up branch yet. This audit is a decision record, not a claim that Deen DTS support has been ported or compiled.
+Selected v6.1 `msm8953.dtsi` and `pm8953.dtsi` files have been copied unchanged into the isolated `deen/dts-bringup` branch, with blob hashes recorded. A minimal board DTSI was then drafted using the mainline Deen PM8953 regulator/eMMC data and the donor's two PVT board IDs. This is a controlled partial port, not a copy of the full 2026 mainline DTS. Compilation and schema validation are still pending; no DTB is approved for device use.
