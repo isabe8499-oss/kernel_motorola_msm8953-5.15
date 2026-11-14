@@ -14,7 +14,7 @@ This repository is kept separate from the existing Linux 3.18.140 and 4.19.325 t
 - Device-specific donor: `isabe8499-oss/kernel_motorola_msm8953-22`, branch `4.19.325-WIP`.
 - Legacy reference: `isabe8499-oss/kernel_motorola_msm8953`, branch `lineage-18.1`.
 
-The exact ACK commit must be pinned before importing its source tree. Device drivers and board support are ported selectively; the 4.19 tree is not copied wholesale into ACK.
+The ACK branch head observed during initial inventory is pinned in `UPSTREAM_BASE.md` (commit `a9ee5509a0c552cb7bd7846b03b538dc2cba7585`). This repository records the reference but does not yet contain a full ACK checkout. Device drivers and board support are ported selectively; the 4.19 tree is not copied wholesale into ACK.
 
 ## Required engineering rules
 
