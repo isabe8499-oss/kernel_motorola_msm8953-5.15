@@ -1,0 +1,122 @@
+name: Import full Android Common Kernel 14-5.15 LTS history
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "bootstrap/IMPORT_ACK"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-ack-android14-5.15-lts
+  cancel-in-progress: false
+
+jobs:
+  import:
+    name: Fetch and preserve upstream Git history
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout destination repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fetch full official ACK history
+        id: fetch
+        env:
+          EXPECTED_ACK_SHA: 5cb316cf9d39318326075731e4e0c39b725d9c99
+        run: |
+          set -euo pipefail
+          echo "Disk before fetch:"
+          df -h .
+          git remote add ack-upstream https://android.googlesource.com/kernel/common.git
+          git -c protocol.version=2 fetch --no-tags ack-upstream \
+            +refs/heads/android14-5.15-lts:refs/remotes/ack/android14-5.15-lts
+          ACK_SHA="$(git rev-parse refs/remotes/ack/android14-5.15-lts)"
+          echo "Fetched ACK SHA: $ACK_SHA"
+          if [[ "$ACK_SHA" != "$EXPECTED_ACK_SHA" ]]; then
+            echo "::error::ACK LTS branch moved. Expected $EXPECTED_ACK_SHA but fetched $ACK_SHA. Stop and re-audit before importing."
+            exit 1
+          fi
+          git cat-file -e "$ACK_SHA^{tree}"
+          COMMIT_COUNT="$(git rev-list --count "$ACK_SHA")"
+          FILE_COUNT="$(git ls-tree -r --name-only "$ACK_SHA" | wc -l)"
+          OBJECT_COUNT="$(git rev-list --objects "$ACK_SHA" | wc -l)"
+          echo "ack_sha=$ACK_SHA" >> "$GITHUB_OUTPUT"
+          echo "commit_count=$COMMIT_COUNT" >> "$GITHUB_OUTPUT"
+          echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
+          echo "object_count=$OBJECT_COUNT" >> "$GITHUB_OUTPUT"
+          echo "Disk after fetch:"
+          df -h .
+
+      - name: Push immutable upstream and Deen bring-up refs
+        env:
+          ACK_SHA: ${{ steps.fetch.outputs.ack_sha }}
+        run: |
+          set -euo pipefail
+          for ref in \
+            refs/heads/upstream/android14-5.15-lts \
+            refs/heads/deen/bringup-ack515-base; do
+            if git ls-remote --exit-code --heads origin "$ref" >/dev/null 2>&1; then
+              echo "::error::Remote branch $ref already exists; refusing to overwrite it."
+              exit 1
+            fi
+          done
+          git push origin \
+            "$ACK_SHA:refs/heads/upstream/android14-5.15-lts" \
+            "$ACK_SHA:refs/heads/deen/bringup-ack515-base"
+
+      - name: Record imported source lock on main
+        env:
+          ACK_SHA: ${{ steps.fetch.outputs.ack_sha }}
+          COMMIT_COUNT: ${{ steps.fetch.outputs.commit_count }}
+          FILE_COUNT: ${{ steps.fetch.outputs.file_count }}
+          OBJECT_COUNT: ${{ steps.fetch.outputs.object_count }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git switch -C main origin/main
+          mkdir -p documentation
+          cat > documentation/ACK_IMPORT_LOCK.md <<EOF
+          # Android Common Kernel import lock
+
+          - Upstream: https://android.googlesource.com/kernel/common
+          - Upstream branch: `android14-5.15-lts`
+          - Imported commit: `$ACK_SHA`
+          - Commit count reachable from imported ref: $COMMIT_COUNT
+          - Tracked file count at imported tree: $FILE_COUNT
+          - Git objects reachable from imported ref: $OBJECT_COUNT
+          - Import method: full Git fetch and ref push; commit history and original commit IDs are preserved.
+          - Destination refs: `upstream/android14-5.15-lts` and `deen/bringup-ack515-base`
+          
+          This records an upstream source snapshot. It does not claim Deen support has been ported or that the kernel boots on the device.
+          EOF
+          git add documentation/ACK_IMPORT_LOCK.md
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -m "docs: record imported ACK android14 5.15 LTS source lock"
+            git push origin HEAD:refs/heads/main
+          fi
+
+      - name: Publish import summary
+        env:
+          ACK_SHA: ${{ steps.fetch.outputs.ack_sha }}
+          COMMIT_COUNT: ${{ steps.fetch.outputs.commit_count }}
+          FILE_COUNT: ${{ steps.fetch.outputs.file_count }}
+          OBJECT_COUNT: ${{ steps.fetch.outputs.object_count }}
+        run: |
+          {
+            echo "## Android Common Kernel 5.15 LTS import"
+            echo
+            echo "- Commit: `$ACK_SHA`"
+            echo "- Commits reachable: $COMMIT_COUNT"
+            echo "- Files in tree: $FILE_COUNT"
+            echo "- Git objects reachable: $OBJECT_COUNT"
+            echo "- Refs: `upstream/android14-5.15-lts`, `deen/bringup-ack515-base`"
+          } >> "$GITHUB_STEP_SUMMARY"
