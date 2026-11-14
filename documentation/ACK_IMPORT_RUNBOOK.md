@@ -27,6 +27,17 @@ The revised workflow:
 8. Removes the temporary staging ref only after both permanent refs point at the pinned tip.
 9. Writes the exact SHA, checkpoint count and push count into `documentation/ACK_IMPORT_LOCK.md`.
 
+## Independent post-import verification
+
+The repository also contains `.github/workflows/verify-ack-import.yml`. It is triggered by the completion of this import workflow and independently:
+- Reads both permanent remote refs and requires each to equal the pinned ACK SHA.
+- Fetches both refs back into a clean runner and checks their resolved commit IDs.
+- Requires the temporary staging ref to be absent.
+- Runs `git fsck --full` against the pinned commit.
+- Records first-parent/reachable commit counts and the measured Git object-store size.
+
+The source import is not approved for device-port work until this independent verification workflow succeeds.
+
 ## Safety conditions
 
 - The workflow refuses to import if upstream branch head differs from the pinned SHA.
