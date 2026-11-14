@@ -1,33 +1,38 @@
 # ACK 5.15 LTS import runbook
 
-## First attempt result
+## Selected source
 
-Workflow run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43598636592
+- Canonical upstream: https://android.googlesource.com/kernel/common.git
+- Branch: android14-5.15-lts
+- Pinned commit: 5cb316cf9d39318326075731e4e0c39b725d9c99
+- Imported kernel version: Linux 5.15.223
 
-Verified from job logs:
-- Full fetch from `https://android.googlesource.com/kernel/common.git` completed.
-- Fetched revision matched `5cb316cf9d39318326075731e4e0c39b725d9c99`.
-- Disk space after fetch: approximately 83 GiB available.
-- Publication failed during one large push with `RPC failed; HTTP 500`.
+## Publication result
 
-The error was consistent with GitHub's documented 2 GiB maximum for a single push. The import was redesigned to publish chronological first-parent checkpoints, each estimated below a conservative 1.3 GB ceiling.
+The original full-history push failed with HTTP 500 after a successful source fetch. The failure was consistent with GitHub's documented 2 GiB maximum for a single push. The import was redesigned to publish chronological first-parent checkpoints, each estimated below a conservative 1.3 GB ceiling.
 
-## Successful history publication
+The successful publication traversed 63,852 first-parent commits in 64 incremental pushes. The largest estimated checkpoint was 458,419,390 bytes. The resulting repository object store was measured at 2.03 GiB. Both permanent refs point to the exact pinned SHA:
+- upstream/android14-5.15-lts
+- deen/bringup-ack515-base
 
-The corrected import job published 63,852 first-parent commits through 64 increments. The largest estimated pack in the completed run was 458,419,390 bytes. It then created both permanent refs at the pinned SHA and deleted the temporary staging ref.
+The temporary import/staging-android14-5.15-lts ref was removed after promotion.
 
-GitHub's compare endpoint returned `identical` for each permanent ref against the pinned source commit. The final workflow also performs:
-- `git fsck --full --no-reflogs` on the fetched source commit.
-- Remote read-back for `upstream/android14-5.15-lts` and `deen/bringup-ack515-base`.
-- A remote query confirming that the temporary staging ref is absent.
-- Publication of `documentation/ACK_IMPORT_LOCK.md` and `documentation/ACK_IMPORT_VERIFICATION.md` only after those gates pass.
+## Integrity gate
 
-The report file is the machine-readable project gate: Deen porting must remain blocked until it exists and shows PASS.
+The report `documentation/ACK_IMPORT_VERIFICATION.md` records PASS and confirms:
+- 1,092,253 reachable commits.
+- Both permanent refs match the pinned SHA.
+- Both refs were fetched back and their commit IDs checked.
+- The temporary staging ref is absent.
+- `git fsck --full` passed.
 
-## Recovery design
+The import workflow also performs its own full fsck before writing the lock and verification report. The imported source is therefore approved for the next engineering phase: ACK configuration and object smoke testing.
 
-The import workflow is idempotent. If both permanent refs already equal the pinned SHA and staging is absent, it skips history publication and runs the integrity/read-back/documentation steps. If publication stops mid-way, it resumes only from a staging commit on the pinned first-parent chain. It never force-pushes donor or ACK history.
+This approval certifies source-history integrity only. It is not a device-specific build, DTB validation or boot test.
 
-## GitHub push-limit reference
+## Recovery and safety
 
+The importer is idempotent. If both permanent refs already equal the pinned SHA and staging is absent, it skips history publication and reruns the source integrity/read-back/documentation gates. If publication stops mid-way, it resumes only from a staging commit on the pinned first-parent chain. It never force-pushes donor or ACK history and never modifies the 3.18 or 4.19 donor repositories.
+
+GitHub push-limit reference:
 https://docs.github.com/en/get-started/using-git/troubleshooting-the-2-gb-push-limit
