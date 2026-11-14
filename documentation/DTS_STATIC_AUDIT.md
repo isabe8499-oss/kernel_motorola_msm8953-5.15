@@ -13,6 +13,10 @@ Branch: `deen/dts-bringup`
 | `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts` | `f5b97d8e3d855aca47ba511a0f2d0ef9d413f513` | 474 bytes |
 | `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts` | `c0fcd9d9c9c4c33bc46d303d564aae85f84613a3` | 474 bytes |
 
+## Binding compatibility
+
+The ACK 5.15 `Documentation/devicetree/bindings/arm/qcom.yaml` predates the MSM8953 Deen compatible. The bring-up branch adds the minimal `motorola,deen` + `qcom,msm8953` pair, based on mainline commit `51c5d61ba73bde54d7900276cb1c0e37d416adfb`. This is a limited schema addition; it does not replace the old binding file.
+
 ## Static phandle result
 
 - Label definitions found across the five files: **137**
@@ -39,7 +43,7 @@ It intentionally does not enable SDHC2, USB, remote processors, NFC, display, to
 ## Open blockers
 
 1. CI/Kbuild compilation of the synthetic base fixture and both PVT DTBs is pending.
-2. dt-schema validation and review of all binding warnings are pending.
+2. `dt_binding_check` and `dtbs_check` against the updated Qualcomm ARM binding are pending.
 3. Device-side stock DTB/bootloader evidence is required to identify PVT1 vs PVT2.
 4. Memory/reserved-memory, ramoops, TZ log and watchdog context reservations still need a controlled port from the clean donor and validation against the exact firmware memory map.
 5. UART console route must be confirmed before enabling.
