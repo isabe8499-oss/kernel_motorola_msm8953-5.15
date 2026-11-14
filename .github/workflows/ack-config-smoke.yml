@@ -44,15 +44,26 @@ jobs:
             python3 python3-dev dwarves binutils-aarch64-linux-gnu \
             clang-18 lld-18 llvm-18
 
-      - name: Add versioned LLVM tools to the generic tool names expected by Kbuild
+      - name: Add LLVM 18 binary directory and aliases required by Kbuild
         shell: bash
         run: |
           set -euo pipefail
+          LLVM_BIN="/usr/lib/llvm-18/bin"
+          if [[ ! -x "$LLVM_BIN/ld.lld" ]]; then
+            sudo apt-get install -y --no-install-recommends lld lld-18
+          fi
+          test -x "$LLVM_BIN/ld.lld" || {
+            echo "::error::LLVM 18 linker not found at $LLVM_BIN/ld.lld"
+            find /usr -type f -name 'ld.lld*' -print 2>/dev/null | head -n 20
+            exit 1
+          }
           mkdir -p "$RUNNER_TEMP/llvm-bin"
+          echo "$LLVM_BIN" >> "$GITHUB_PATH"
           for TOOL in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
-            VERSIONED="$TOOL-18"
-            if command -v "$VERSIONED" >/dev/null 2>&1; then
-              ln -sf "$(command -v "$VERSIONED")" "$RUNNER_TEMP/llvm-bin/$TOOL"
+            if [[ -x "$LLVM_BIN/$TOOL" ]]; then
+              ln -sf "$LLVM_BIN/$TOOL" "$RUNNER_TEMP/llvm-bin/$TOOL"
+            elif [[ -x "/usr/bin/$TOOL-18" ]]; then
+              ln -sf "/usr/bin/$TOOL-18" "$RUNNER_TEMP/llvm-bin/$TOOL"
             fi
           done
           echo "$RUNNER_TEMP/llvm-bin" >> "$GITHUB_PATH"
@@ -86,7 +97,7 @@ jobs:
           mkdir -p "$OUT"
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 gki_defconfig
@@ -113,7 +124,7 @@ jobs:
 
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
@@ -138,7 +149,7 @@ jobs:
           OUT="$RUNNER_TEMP/ack-out"
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
-            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 -j2 \
