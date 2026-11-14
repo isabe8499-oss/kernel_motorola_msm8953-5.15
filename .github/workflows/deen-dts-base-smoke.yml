@@ -37,8 +37,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential flex libelf-dev libncurses-dev libssl-dev \
-            python3 python3-dev dwarves binutils-aarch64-linux-gnu \
+            python3 python3-dev python3-venv dwarves binutils-aarch64-linux-gnu \
             clang-18 lld-18 llvm-18
+
+      - name: Install devicetree schema validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/dtschema-venv"
+          "$RUNNER_TEMP/dtschema-venv/bin/pip" install --upgrade pip dtschema
+          echo "$RUNNER_TEMP/dtschema-venv/bin" >> "$GITHUB_PATH"
 
       - name: Fetch clean Deen DTS bring-up branch
         shell: bash
@@ -99,6 +107,28 @@ jobs:
           DTS_STATUS=${PIPESTATUS[0]}
           set -e
 
+          set +e
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 \
+            DT_SCHEMA_FILES=Documentation/devicetree/bindings/arm/qcom.yaml \
+            dt_binding_check 2>&1 | tee "$RUNNER_TEMP/dt-binding-check.log"
+          BINDING_STATUS=${PIPESTATUS[0]}
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld-18 AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 \
+            DT_SCHEMA_FILES=Documentation/devicetree/bindings/arm/qcom.yaml \
+            dtbs_check 2>&1 | tee "$RUNNER_TEMP/dtbs-check.log"
+          DTBS_STATUS=${PIPESTATUS[0]}
+          set -e
+
           BASE_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb"
           PVT1_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
           PVT2_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
@@ -110,6 +140,9 @@ jobs:
             PVT1_SHA="$(sha256sum "$PVT1_DTB" | awk '{print $1}')"
             PVT2_SHA="$(sha256sum "$PVT2_DTB" | awk '{print $1}')"
           else
+            DTS_STATUS=1
+          fi
+          if [[ "$BINDING_STATUS" -ne 0 || "$DTBS_STATUS" -ne 0 ]]; then
             DTS_STATUS=1
           fi
 
@@ -128,7 +161,9 @@ jobs:
             echo "- PMIC DTSI source: Linux v6.1, blob a1d36f9ebbd259e41a80e3af516d9a044419afe0"
             echo "- ACK base: Android Common Kernel 5.15 LTS"
             echo "- Compiler: $CLANG_VERSION"
-            echo "- Test: generated minimal DTS includes msm8953.dtsi and pm8953.dtsi"
+            echo "- Test: generated base fixture plus Deen PVT1/PVT2 DTBs"
+            echo "- qcom.yaml dt_binding_check exit: $BINDING_STATUS"
+            echo "- qcom.yaml dtbs_check exit: $DTBS_STATUS"
             echo "- Base-only fixture DTB SHA-256: $BASE_SHA"
             echo "- Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): $PVT1_SHA"
             echo "- Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): $PVT2_SHA"
@@ -139,8 +174,14 @@ jobs:
           if [[ "$DTS_STATUS" -ne 0 ]]; then
             {
               echo
-              echo "## Last build log lines"
-              tail -n 100 "$RUNNER_TEMP/dts-build.log"
+              echo "## Last DTS compile log lines"
+              if [[ -s "$RUNNER_TEMP/dts-build.log" ]]; then tail -n 70 "$RUNNER_TEMP/dts-build.log"; fi
+              echo
+              echo "## Last dt_binding_check log lines"
+              if [[ -s "$RUNNER_TEMP/dt-binding-check.log" ]]; then tail -n 70 "$RUNNER_TEMP/dt-binding-check.log"; fi
+              echo
+              echo "## Last dtbs_check log lines"
+              if [[ -s "$RUNNER_TEMP/dtbs-check.log" ]]; then tail -n 70 "$RUNNER_TEMP/dtbs-check.log"; fi
             } >> "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md"
           fi
 
@@ -155,6 +196,8 @@ jobs:
           path: |
             ${{ runner.temp }}/DEEN_DTS_BASE_SMOKE.md
             ${{ runner.temp }}/dts-build.log
+            ${{ runner.temp }}/dt-binding-check.log
+            ${{ runner.temp }}/dtbs-check.log
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
