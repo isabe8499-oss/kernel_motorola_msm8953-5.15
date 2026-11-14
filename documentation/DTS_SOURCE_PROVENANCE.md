@@ -39,3 +39,6 @@ Selective upstream backport:
 - Existing ACK 5.15 RPMPD implementation and other SoC entries are preserved.
 
 This is a focused driver/binding backport. It must be compiled as `drivers/soc/qcom/rpmpd.o` and validated with the Deen DTB candidates before being treated as integrated.
+
+
+- `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`: added `qcom,msm8953-rpmpd` to the compatible enum using Linux v6.1 schema semantics. The ACK 5.15 schema predated MSM8953 support.
