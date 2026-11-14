@@ -180,8 +180,24 @@ jobs:
         run: |
           set -euo pipefail
           LINKER_PATH="$RUNNER_TEMP/llvm-bin/ld.lld"
-          REAL_LINKER="$(readlink -f "$LINKER_PATH")"
+          if [[ -L "$LINKER_PATH" ]]; then
+            LINKER_TARGET="$(readlink "$LINKER_PATH")"
+            if [[ "$LINKER_TARGET" != /* ]]; then
+              LINKER_TARGET="$(realpath -s "$(dirname "$LINKER_PATH")/$LINKER_TARGET")"
+            fi
+          else
+            LINKER_TARGET="$LINKER_PATH"
+          fi
+
+          # Keep the executable alias named ld.lld. Resolving the symlink with
+          # readlink -f changes argv[0] to "lld-18", which selects the generic
+          # driver instead of the ELF linker.
+          REAL_LINKER_DIR="$RUNNER_TEMP/real-llvm-linker"
+          mkdir -p "$REAL_LINKER_DIR"
+          REAL_LINKER="$REAL_LINKER_DIR/ld.lld"
+          ln -sf "$LINKER_TARGET" "$REAL_LINKER"
           test -x "$REAL_LINKER"
+
           LLD_HELP="$("$REAL_LINKER" --help)"
           grep -q -- '--threads' <<< "$LLD_HELP"
           "$REAL_LINKER" --threads=1 --version
@@ -190,9 +206,16 @@ jobs:
           printf '#!/usr/bin/env bash\nexec "%s" --threads=1 "$@"\n' "$REAL_LINKER" > "$LINKER_PATH"
           chmod 755 "$LINKER_PATH"
 
-          echo "LLD wrapper:"
+          # Prove the wrapper performs a real ELF link before the expensive kernel LTO.
+          printf '.globl _start\n_start:\n  ret\n' > "$RUNNER_TEMP/lld-smoke.s"
+          clang-18 -c "$RUNNER_TEMP/lld-smoke.s" -o "$RUNNER_TEMP/lld-smoke.o"
+          "$LINKER_PATH" -e _start -o "$RUNNER_TEMP/lld-smoke" "$RUNNER_TEMP/lld-smoke.o"
+          test -s "$RUNNER_TEMP/lld-smoke"
+
+          echo "LLD wrapper and smoke ELF:"
           "$LINKER_PATH" --version
-          sha256sum "$REAL_LINKER" "$LINKER_PATH"
+          file "$RUNNER_TEMP/lld-smoke"
+          sha256sum "$REAL_LINKER" "$LINKER_PATH" "$RUNNER_TEMP/lld-smoke"
 
       - name: Build complete Image and both Deen DTB candidates
         id: build
