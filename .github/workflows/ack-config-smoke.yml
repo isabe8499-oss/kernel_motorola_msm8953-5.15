@@ -137,13 +137,11 @@ jobs:
           - Required resolved symbols: ARCH_QCOM, COMMON_CLK_QCOM, MSM_GCC_8953, PINCTRL_MSM, PINCTRL_MSM8953 (all y)
           - Clang: $CLANG_VERSION
           - LLD: $LLD_VERSION
-          - Resolved .config SHA-256: $CONFIG_SHA
+          - Resolved config SHA-256: $CONFIG_SHA
 
-          ## Compiled object hashes
+          ## Compiled object SHA-256 values
 
-          ```text
           $OBJECT_HASHES
-          ```
 
           This is a configuration and two-object compile smoke test only. It is not a full Image/DTB build, Deen device build, ABI validation or boot test.
           EOF
