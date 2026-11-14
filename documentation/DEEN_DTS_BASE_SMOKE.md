@@ -17,4 +17,4 @@
 - Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): 41a0106d6ade5492497a6736a9c930c82f85fe3c909791968f3f7b0726fe5532
 - Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): c06cc92f0487675277588594e03c1ad49eb5e69ff43ae7924bec2f50cb371055
 
-This is only a base-DTS syntax/include smoke test. It has no Deen PVT board ID or peripheral enablement and is not a flashable device tree.
+This is a minimal Deen board-DTS compile and schema smoke test. The PVT1 and PVT2 wrapper DTBs do contain their respective qcom,board-id values (0x4D 0xC100 and 0x4D 0xC200). The shared board DTSI currently describes the 32 MiB QSEE reservation at 0x84300000, PM8953 RPM regulator rails, Volume Up/Down keys and primary non-removable eMMC. It intentionally leaves display, touchscreen, GPU, camera, audio, USB, NFC, WLAN, Bluetooth, fingerprint, sensors, modem/remote processors and removable SD disabled. The physical handset PVT has not been identified. This is not a complete device tree, not a boot-image integration test and not approved for flashing.
