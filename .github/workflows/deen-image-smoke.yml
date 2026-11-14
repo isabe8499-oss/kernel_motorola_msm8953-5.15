@@ -45,8 +45,12 @@ jobs:
           git fetch --no-tags --depth=1 origin \
             +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup
           git worktree add --detach "$SRC" refs/remotes/origin/deen/dts-bringup
-          echo "Deen source commit: $(git -C "$SRC" rev-parse HEAD)"
-          echo "ACK base ancestry: $(git -C "$SRC" merge-base HEAD 5cb316cf9d39318326075731e4e0c39b725d9c99)"
+          SOURCE_SHA="$(git -C "$SRC" rev-parse HEAD)"
+          echo "Deen source commit: $SOURCE_SHA"
+          test -s "$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts"
+          test -s "$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts"
+          grep -q "MSM8953_VDDCX" "$SRC/include/dt-bindings/power/qcom-rpmpd.h"
+          grep -q "qcom,msm8953-rpmpd" "$SRC/drivers/soc/qcom/rpmpd.c"
 
       - name: Configure the generic GKI base plus MSM8953 boot dependencies
         id: configure
