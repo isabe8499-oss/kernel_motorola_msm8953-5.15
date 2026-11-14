@@ -80,7 +80,20 @@ jobs:
             --enable COMMON_CLK_QCOM \
             --enable MSM_GCC_8953 \
             --enable PINCTRL_MSM \
-            --enable PINCTRL_MSM8953
+            --enable PINCTRL_MSM8953 \
+            --enable RPMSG \
+            --enable QCOM_SMD_RPM \
+            --enable SPMI \
+            --enable SPMI_MSM_PMIC_ARB \
+            --enable MFD_SPMI_PMIC \
+            --enable REGULATOR_QCOM_SMD_RPM \
+            --enable REGULATOR_QCOM_SPMI \
+            --enable REGULATOR_FIXED_VOLTAGE \
+            --enable MMC \
+            --enable MMC_SDHCI \
+            --enable MMC_SDHCI_PLTFM \
+            --enable MMC_SDHCI_MSM \
+            --enable KEYBOARD_GPIO
 
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE="$CROSS_COMPILE" \
@@ -89,9 +102,14 @@ jobs:
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
 
-          for SYMBOL in ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953; do
+          for SYMBOL in \
+            ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 \
+            RPMSG QCOM_SMD_RPM SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC \
+            REGULATOR_QCOM_SMD_RPM REGULATOR_QCOM_SPMI REGULATOR_FIXED_VOLTAGE \
+            MMC MMC_SDHCI MMC_SDHCI_PLTFM MMC_SDHCI_MSM KEYBOARD_GPIO; do
             grep -qx "CONFIG_${SYMBOL}=y" "$OUT/.config" || {
               echo "::error::Kconfig dependency resolution did not retain CONFIG_${SYMBOL}=y"
+              grep -E "^(CONFIG_${SYMBOL}=|# CONFIG_${SYMBOL} is not set)" "$OUT/.config" || true
               exit 1
             }
           done
@@ -107,13 +125,41 @@ jobs:
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 -j2 \
             drivers/clk/qcom/gcc-msm8953.o \
-            drivers/pinctrl/qcom/pinctrl-msm8953.o
+            drivers/pinctrl/qcom/pinctrl-msm8953.o \
+            drivers/spmi/spmi-pmic-arb.o \
+            drivers/mfd/qcom-spmi-pmic.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/regulator/qcom_smd-regulator.o \
+            drivers/regulator/qcom_spmi-regulator.o \
+            drivers/mmc/host/sdhci-msm.o \
+            drivers/input/keyboard/gpio_keys.o
 
-          test -s "$OUT/drivers/clk/qcom/gcc-msm8953.o"
-          test -s "$OUT/drivers/pinctrl/qcom/pinctrl-msm8953.o"
+          for OBJECT in \
+            drivers/clk/qcom/gcc-msm8953.o \
+            drivers/pinctrl/qcom/pinctrl-msm8953.o \
+            drivers/spmi/spmi-pmic-arb.o \
+            drivers/mfd/qcom-spmi-pmic.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/regulator/qcom_smd-regulator.o \
+            drivers/regulator/qcom_spmi-regulator.o \
+            drivers/mmc/host/sdhci-msm.o \
+            drivers/input/keyboard/gpio_keys.o; do
+            test -s "$OUT/$OBJECT" || {
+              echo "::error::Missing expected object $OBJECT"
+              exit 1
+            }
+          done
+
           sha256sum \
             "$OUT/drivers/clk/qcom/gcc-msm8953.o" \
             "$OUT/drivers/pinctrl/qcom/pinctrl-msm8953.o" \
+            "$OUT/drivers/spmi/spmi-pmic-arb.o" \
+            "$OUT/drivers/mfd/qcom-spmi-pmic.o" \
+            "$OUT/drivers/soc/qcom/smd-rpm.o" \
+            "$OUT/drivers/regulator/qcom_smd-regulator.o" \
+            "$OUT/drivers/regulator/qcom_spmi-regulator.o" \
+            "$OUT/drivers/mmc/host/sdhci-msm.o" \
+            "$OUT/drivers/input/keyboard/gpio_keys.o" \
             > "$RUNNER_TEMP/ACK_OBJECT_SHA256SUMS"
 
       - name: Write smoke-test report
@@ -134,7 +180,7 @@ jobs:
           - Pinned source SHA: $ACK_SHA
           - Architecture: arm64
           - Base configuration: gki_defconfig followed by olddefconfig
-          - Required resolved symbols: ARCH_QCOM, COMMON_CLK_QCOM, MSM_GCC_8953, PINCTRL_MSM, PINCTRL_MSM8953 (all y)
+          - Required resolved symbols: MSM8953 GCC/pinctrl, SPMI PMIC arbiter/MFD, SMD RPM and both regulator paths, SDHCI MSM and GPIO keys (all y)
           - Clang: $CLANG_VERSION
           - LLD: $LLD_VERSION
           - Resolved config SHA-256: $CONFIG_SHA
@@ -195,4 +241,11 @@ jobs:
             ${{ runner.temp }}/ack-out/.config
             ${{ runner.temp }}/ack-out/drivers/clk/qcom/gcc-msm8953.o
             ${{ runner.temp }}/ack-out/drivers/pinctrl/qcom/pinctrl-msm8953.o
+            ${{ runner.temp }}/ack-out/drivers/spmi/spmi-pmic-arb.o
+            ${{ runner.temp }}/ack-out/drivers/mfd/qcom-spmi-pmic.o
+            ${{ runner.temp }}/ack-out/drivers/soc/qcom/smd-rpm.o
+            ${{ runner.temp }}/ack-out/drivers/regulator/qcom_smd-regulator.o
+            ${{ runner.temp }}/ack-out/drivers/regulator/qcom_spmi-regulator.o
+            ${{ runner.temp }}/ack-out/drivers/mmc/host/sdhci-msm.o
+            ${{ runner.temp }}/ack-out/drivers/input/keyboard/gpio_keys.o
           if-no-files-found: error
