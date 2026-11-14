@@ -19,9 +19,6 @@ jobs:
     name: Compile MSM8953 and PM8953 DTSI base
     runs-on: ubuntu-24.04
     timeout-minutes: 90
-    env:
-      SRC: ${{ runner.temp }}/deen-src
-      OUT: ${{ runner.temp }}/deen-out
     steps:
       - name: Check out project control branch
         uses: actions/checkout@v4
@@ -52,8 +49,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
           git fetch --no-tags --depth=1 origin \
-            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup
+            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup"
           git worktree add --detach "$SRC" refs/remotes/origin/deen/dts-bringup
           git -C "$SRC" rev-parse HEAD
 
@@ -62,6 +60,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          OUT="$RUNNER_TEMP/deen-out"
           mkdir -p "$OUT"
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
