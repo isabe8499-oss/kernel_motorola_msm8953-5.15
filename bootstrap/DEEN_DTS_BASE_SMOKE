@@ -2,4 +2,4 @@
 
 Compile a runtime-generated minimal DTS that includes the imported Linux v6.1 msm8953.dtsi and pm8953.dtsi against the clean ACK 5.15 branch deen/dts-bringup. The fixture is CI-only and must never be used as a flashable Deen DTB.
 
-Trigger request: 2026-11-14T14:45:00-03:00. Compile fixture and both PVT DTBs, validate with pinned dtschema 2024.2 using processed schema, and compile the backported MSM8953 rpmpd.o.
+Trigger request: 2026-11-14T16:10:00-03:00. Validate selected Deen DTBs against only qcom.yaml and qcom,rpmpd.yaml schemas; previous all-bindings schema generated invalid output due unrelated OMAP schema warnings.
