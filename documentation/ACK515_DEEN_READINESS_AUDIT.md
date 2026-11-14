@@ -104,9 +104,18 @@ The donor's two board files declare the same compatible chain but distinct board
 
 The donor Makefile builds both DTBs under CONFIG_MACH_MOTOROLA_DEEN. Do not choose one by assumption. The actual XT1941-3 board ID must be read from the device's bootloader/device-tree evidence before selecting a production DTB. Until then, both variants must remain available in the bring-up work.
 
-## 9. Isolated DTSI compile workflow
+## 9. Current CI validation records
 
-An experimental GitHub Actions workflow was added on deen/dts-bringup:
-.github/workflows/deen-msm8953-dtsi-validation.yml
+The initial temporary DTSI fixture workflow has been superseded by the Deen board smoke workflow:
 
-It creates a temporary minimal validation board in the runner only and attempts to compile the imported msm8953.dtsi + pm8953.dtsi against the pinned ACK 5.15 tree. It does not commit the temporary test board or modify the production DTS tree. Its run is currently being evaluated; do not mark Phase A passed until the Actions result is successful and the produced DTB is non-empty.
+- Workflow: .github/workflows/deen-dts-base-smoke.yml
+- Passing run: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43620086484
+- Tested branch commit: d86ecf2fa95fe3635b4ffc606fdd39b048760d1e
+- Tested artifacts: base fixture, PVT1 DTB and PVT2 DTB
+- Schema checks: dt-doc-validate, processed schema generation and targeted dt-validate all exit 0
+- Backported MSM8953 rpmpd.o compiled.
+
+A separate full Image build is running:
+https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595
+
+That workflow uses generic GKI defconfig plus MSM8953 options. It is not a Deen-specific defconfig, not a boot image and not a hardware test. Its result must be reviewed before the next gate is marked complete.
