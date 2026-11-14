@@ -8,12 +8,12 @@
 - [x] Verify the two refs against the pinned SHA and confirm staging ref absence.
 - [x] Run `git fsck --full`; report PASS in `documentation/ACK_IMPORT_VERIFICATION.md`.
 
-## Gate 1 — ACK base configuration and compiler smoke
+## Gate 1 — ACK base configuration and controller-object smoke — PASS
 
-1. Run `gki_defconfig` and `olddefconfig` on the pinned tree.
-2. Enable only the existing MSM8953 GCC and pinctrl drivers under Kconfig dependency checks.
-3. Compile `gcc-msm8953.o` and `pinctrl-msm8953.o` with a pinned LLVM toolchain.
-4. Preserve the resolved config, compiler version, source revision, logs and object hashes.
+- `gki_defconfig` and `olddefconfig` passed on the pinned ACK revision.
+- MSM8953 GCC/pinctrl, SPMI PMIC arbiter/MFD, SMD RPM/RPMPD, both regulator paths, SDHCI MSM and GPIO keys resolved as built-in.
+- Ten selected objects compiled with Clang/LLD 18. Their hashes and the resolved config are recorded in `documentation/ACK_BASE_CONFIG_SMOKE.md`.
+- This is not a full kernel link; the next CI gate builds the complete `Image`.
 
 ## Gate 2 — Deen hardware identity and boot contract
 
@@ -21,13 +21,13 @@
 2. Use documentation/BOOT_CONTRACT_AUDIT.md as a provisional reference, then capture the exact device's boot_a/boot_b, vendor_boot, dtbo, recovery and vbmeta partition inventory and unpack the current Android 12 boot image. Do not rely on old BoardConfig values alone.
 3. Preserve a known-good boot image and tested recovery method before any flash test.
 
-## Gate 3 — MSM8953 Device Tree foundation
+## Gate 3 — MSM8953 Device Tree foundation — COMPILE/SCHEMA PASS
 
-1. The isolated `deen/dts-bringup` branch now carries unchanged v6.1 `msm8953.dtsi`/`pm8953.dtsi` plus a minimal shared Deen DTSI and PVT1/PVT2 wrappers.
-2. Run the CI base fixture and both candidate DTBs; record compiler output and hashes before further expansion.
-3. Resolve any dtc failures; then add and audit the device-specific memory/reserved-memory and console requirements from the clean donor.
-4. Preserve both PVT candidates until the handset board ID is identified. Do not flash either candidate.
-5. Run dtc and schema checks; review warnings and verify regulators, clocks, pinctrl, interrupts and eMMC.
+- The isolated `deen/dts-bringup` branch carries the v6.1 MSM8953/PM8953 base plus a shared Deen board DTSI and separate PVT1/PVT2 wrappers.
+- CI run 43620086484 compiled the base fixture and both candidate DTBs; `dt-doc-validate`, schema generation and targeted `dt-validate` all returned exit 0.
+- The QSEE 32 MiB reservation and conflicting inherited QSEE/continuous-splash reservations were checked by the same DTB compile.
+- Both PVT candidates remain available until the handset's hardware revision is read from the bootloader. Neither is approved for flashing.
+- Runtime regulator/eMMC sequencing, memory behavior, bootloader matching and serial console still require device-specific evidence.
 
 ## Gate 4 — Minimal Deen kernel configuration
 
