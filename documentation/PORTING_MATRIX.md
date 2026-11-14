@@ -5,7 +5,7 @@ Status values: **Present** = implementation exists in pinned ACK; **Gap** = devi
 | Area | 4.19 donor evidence | Pinned ACK 5.15 evidence / gap | Priority |
 |---|---|---|---|
 | SoC / machine | `ARCH_MSM8953`, Deen PVT1/PVT2 support | Qualcomm platform framework is present, but no MSM8953/Deen DTS integration in the pinned ACK. | P0 |
-| Base Device Tree | Vendor `msm8953.dtsi`, `msm8953-pinctrl.dtsi`, PMIC fragments | MSM8953, PM8953, PMI8950 and MSM8953 pinctrl DTS files are absent. Mainline DTS audit identifies a newer reference, not a drop-in 5.15 port. | P0 |
+| Base Device Tree | Vendor `msm8953.dtsi`, `msm8953-pinctrl.dtsi`, PMIC fragments | Pinned ACK lacked the base. Unchanged v6.1 `msm8953.dtsi` and `pm8953.dtsi` now exist on `deen/dts-bringup`; the SoC DTSI already defines TLMM, UART, SPMI, RPM and SDHC nodes. No separate pinctrl DTSI is currently needed for this base. DTB compile pending. | P0 |
 | Deen DTS / DTB | PVT1/PVT2 DTS + modular Deen fragments; board IDs C100/C200 | No Deen DTB target in ACK. Translate board nodes to 5.15 bindings; preserve both PVT candidates until board revision is identified. | P0 |
 | Clocks / reset | Deen GCC, RPM clocks and reset references | MSM8953 GCC driver, Kconfig and Makefile wiring exist. Audit clock IDs, resets, parents and DT references. | P0 |
 | Pinctrl / GPIO | Deen TLMM pin groups and GPIO assignments | MSM8953 pinctrl driver, Kconfig and Makefile wiring exist. Port pin states only after matching function/group definitions and IRQ semantics. | P0 |
