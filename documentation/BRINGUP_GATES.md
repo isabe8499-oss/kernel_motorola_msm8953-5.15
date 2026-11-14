@@ -42,11 +42,15 @@ Evidence and DTB hashes are in documentation/DEEN_DTS_BASE_SMOKE.md; source inve
 
 The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qualcomm ARM binding) were compared with the current deen/dts-bringup branch and are unchanged. Subsequent changes on that branch are documentation-only. A further binary read-back test using fdtget is running in CI run 43623081943; it checks the actual compiled qcom,board-id values, QSEE reg cells and absence of the two replaced memory nodes.
 
-## Gate D — full kernel Image link: RETRY QUEUED / NOT YET APPROVED
+## Gate D — full kernel Image link: RETRY IN PROGRESS / NOT APPROVED
 
-First attempt: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (attempt 1 failed at the runner level with exit 143 and a shutdown signal during LTO `vmlinux.o`; no compiler diagnostic or artifact was produced). The failed job was re-queued as attempt 2; verify its result before changing kernel source.
+First attempt: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (exit 143 during LTO `vmlinux.o`; no compiler diagnostic or artifact was produced).
 
-It uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image.
+Second attempt: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43634169633 (commit `8d677631bef03f683e87390a21e46fc0fd16061d`). The operator-provided Actions screenshot shows the build step ending with `Process completed with exit code 143` after entering `LTO vmlinux.o`; the artifact/report steps had not started in the captured UI. The GitHub API continued reporting this run as in progress with no artifacts, so its final runner conclusion remains unavailable. This is a termination signal, not a compiler diagnostic; OOM has not been established.
+
+A new isolated retry is running: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43640092181 (commit `50477cc5c111ef9bab8294517a7309d7493b74db`). Its CI-only changes preserve `CONFIG_LTO_CLANG_FULL=y` and `CONFIG_CFI_CLANG=y`, cap LLD's own link-time worker pool at one thread, create only 2–4 GiB swap when filesystem headroom allows (instead of a fixed 12 GiB), and persist 30-second RAM/swap/PSI/cgroup/OOM-counter telemetry as an artifact. The retry uses a separate concurrency group to avoid waiting behind the stale prior run.
+
+The build still uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image. Full success, hashes and artifact inspection are required before Gate D can pass.
 
 ## Gate E — identify actual handset hardware revision: BLOCKED ON DEVICE EVIDENCE
 
