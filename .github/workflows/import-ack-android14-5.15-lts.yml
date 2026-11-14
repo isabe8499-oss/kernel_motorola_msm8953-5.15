@@ -16,9 +16,9 @@ concurrency:
 
 jobs:
   import:
-    name: Fetch and preserve upstream Git history
+    name: Fetch and incrementally publish full upstream Git history
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 240
     steps:
       - name: Checkout destination repository
         uses: actions/checkout@v4
@@ -26,57 +26,167 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Fetch full official ACK history
-        id: fetch
+      - name: Fetch and verify the immutable official ACK revision
+        id: source
         env:
           EXPECTED_ACK_SHA: 5cb316cf9d39318326075731e4e0c39b725d9c99
         run: |
           set -euo pipefail
-          echo "Disk before fetch:"
-          df -h .
           git remote add ack-upstream https://android.googlesource.com/kernel/common.git
           git -c protocol.version=2 fetch --no-tags ack-upstream \
             +refs/heads/android14-5.15-lts:refs/remotes/ack/android14-5.15-lts
           ACK_SHA="$(git rev-parse refs/remotes/ack/android14-5.15-lts)"
-          echo "Fetched ACK SHA: $ACK_SHA"
-          if [[ "$ACK_SHA" != "$EXPECTED_ACK_SHA" ]]; then
-            echo "::error::ACK LTS branch moved. Expected $EXPECTED_ACK_SHA but fetched $ACK_SHA. Stop and re-audit before importing."
+          echo "Fetched ACK revision: $ACK_SHA"
+          test "$ACK_SHA" = "$EXPECTED_ACK_SHA" || {
+            echo "::error::Upstream branch changed. Expected $EXPECTED_ACK_SHA, got $ACK_SHA. Stop for review."
             exit 1
-          fi
-          git cat-file -e "$ACK_SHA^{tree}"
-          COMMIT_COUNT="$(git rev-list --count "$ACK_SHA")"
-          FILE_COUNT="$(git ls-tree -r --name-only "$ACK_SHA" | wc -l)"
-          OBJECT_COUNT="$(git rev-list --objects "$ACK_SHA" | wc -l)"
+          }
+          git cat-file -e "$ACK_SHA^{commit}"
           echo "ack_sha=$ACK_SHA" >> "$GITHUB_OUTPUT"
-          echo "commit_count=$COMMIT_COUNT" >> "$GITHUB_OUTPUT"
-          echo "file_count=$FILE_COUNT" >> "$GITHUB_OUTPUT"
-          echo "object_count=$OBJECT_COUNT" >> "$GITHUB_OUTPUT"
           echo "Disk after fetch:"
           df -h .
 
-      - name: Push immutable upstream and Deen bring-up refs
+      - name: Publish history in sub-2-GiB first-parent increments
+        id: publish
         env:
-          ACK_SHA: ${{ steps.fetch.outputs.ack_sha }}
+          ACK_SHA: ${{ steps.source.outputs.ack_sha }}
         run: |
           set -euo pipefail
-          for ref in \
-            refs/heads/upstream/android14-5.15-lts \
-            refs/heads/deen/bringup-ack515-base; do
-            if git ls-remote --exit-code --heads origin "$ref" >/dev/null 2>&1; then
-              echo "::error::Remote branch $ref already exists; refusing to overwrite it."
+          STAGING_REF="refs/heads/import/staging-android14-5.15-lts"
+          REMOTE_STAGING="refs/remotes/origin/import/staging-android14-5.15-lts"
+          MAX_PACK_BYTES=1300000000
+          INITIAL_SPAN=1000
+          mkdir -p "$RUNNER_TEMP/ack-import"
+          git rev-list --first-parent --reverse "$ACK_SHA" > "$RUNNER_TEMP/ack-import/first-parent.txt"
+          mapfile -t FIRST_PARENT < "$RUNNER_TEMP/ack-import/first-parent.txt"
+          TOTAL="${#FIRST_PARENT[@]}"
+          test "$TOTAL" -gt 0
+          echo "First-parent commits: $TOTAL"
+
+          PREVIOUS=""
+          START_INDEX=0
+          EXISTING="$(git ls-remote origin "$STAGING_REF" | awk 'NR==1 {print $1}')"
+          if [[ -n "$EXISTING" ]]; then
+            FOUND=0
+            for i in "${!FIRST_PARENT[@]}"; do
+              if [[ "${FIRST_PARENT[$i]}" = "$EXISTING" ]]; then
+                START_INDEX=$((i + 1))
+                PREVIOUS="$EXISTING"
+                FOUND=1
+                break
+              fi
+            done
+            if [[ "$FOUND" -ne 1 ]]; then
+              echo "::error::Existing staging ref is not on the pinned first-parent chain; refusing to rewrite it."
               exit 1
             fi
-          done
-          git push origin \
-            "$ACK_SHA:refs/heads/upstream/android14-5.15-lts" \
-            "$ACK_SHA:refs/heads/deen/bringup-ack515-base"
+            echo "Resuming from checkpoint $PREVIOUS at index $START_INDEX"
+          fi
 
-      - name: Record imported source lock on main
+          pack_bytes_for() {
+            local target="$1"
+            if [[ -n "$PREVIOUS" ]]; then
+              printf '%s\n^%s\n' "$target" "$PREVIOUS" |
+                git pack-objects --stdout --revs --quiet | wc -c
+            else
+              printf '%s\n' "$target" |
+                git pack-objects --stdout --revs --quiet | wc -c
+            fi
+          }
+
+          INDEX="$START_INDEX"
+          SPAN="$INITIAL_SPAN"
+          PUSH_COUNT=0
+          while [[ "$INDEX" -lt "$TOTAL" ]]; do
+            END=$((INDEX + SPAN - 1))
+            if [[ "$END" -ge "$TOTAL" ]]; then END=$((TOTAL - 1)); fi
+            TARGET="${FIRST_PARENT[$END]}"
+            PACK_BYTES="$(pack_bytes_for "$TARGET" | tr -d ' ')"
+            echo "Checkpoint $((END + 1))/$TOTAL; estimated pack: $PACK_BYTES bytes; span=$((END - INDEX + 1))"
+
+            if [[ "$PACK_BYTES" -gt "$MAX_PACK_BYTES" ]]; then
+              if [[ "$SPAN" -le 1 ]]; then
+                echo "::error::A single first-parent step exceeds the safe pack threshold. Requires a Git object/ancestry split strategy."
+                exit 1
+              fi
+              SPAN=$(((SPAN + 1) / 2))
+              echo "Reducing checkpoint span to $SPAN"
+              continue
+            fi
+
+            PUSH_OK=0
+            for ATTEMPT in 1 2 3; do
+              if git push --porcelain origin "$TARGET:$STAGING_REF"; then
+                PUSH_OK=1
+                break
+              fi
+              REMOTE_NOW="$(git ls-remote origin "$STAGING_REF" | awk 'NR==1 {print $1}')"
+              if [[ "$REMOTE_NOW" = "$TARGET" ]]; then
+                PUSH_OK=1
+                break
+              fi
+              if [[ -n "$PREVIOUS" && "$REMOTE_NOW" != "$PREVIOUS" ]]; then
+                echo "::error::Remote staging ref moved unexpectedly to $REMOTE_NOW"
+                exit 1
+              fi
+              if [[ -z "$PREVIOUS" && -n "$REMOTE_NOW" ]]; then
+                echo "::error::Unexpected remote staging ref $REMOTE_NOW"
+                exit 1
+              fi
+              echo "Push attempt $ATTEMPT failed; retrying smaller increment if needed."
+              sleep 12
+            done
+
+            if [[ "$PUSH_OK" -ne 1 ]]; then
+              if [[ "$SPAN" -le 1 ]]; then
+                echo "::error::Push failed even with a single first-parent increment."
+                exit 1
+              fi
+              SPAN=$(((SPAN + 1) / 2))
+              echo "Reducing checkpoint span after push failure to $SPAN"
+              continue
+            fi
+
+            PREVIOUS="$TARGET"
+            INDEX=$((END + 1))
+            PUSH_COUNT=$((PUSH_COUNT + 1))
+            SPAN="$INITIAL_SPAN"
+            echo "Published checkpoint $PUSH_COUNT; next first-parent index=$INDEX"
+            sleep 11
+          done
+
+          test "$PREVIOUS" = "$ACK_SHA"
+          echo "All first-parent increments reached the pinned tip."
+          echo "ack_sha=$ACK_SHA" >> "$GITHUB_OUTPUT"
+          echo "push_count=$PUSH_COUNT" >> "$GITHUB_OUTPUT"
+          echo "first_parent_count=$TOTAL" >> "$GITHUB_OUTPUT"
+
+      - name: Promote completed history to permanent branches
         env:
-          ACK_SHA: ${{ steps.fetch.outputs.ack_sha }}
-          COMMIT_COUNT: ${{ steps.fetch.outputs.commit_count }}
-          FILE_COUNT: ${{ steps.fetch.outputs.file_count }}
-          OBJECT_COUNT: ${{ steps.fetch.outputs.object_count }}
+          ACK_SHA: ${{ steps.source.outputs.ack_sha }}
+        run: |
+          set -euo pipefail
+          STAGING_REF="refs/heads/import/staging-android14-5.15-lts"
+          for REF in \
+            refs/heads/upstream/android14-5.15-lts \
+            refs/heads/deen/bringup-ack515-base; do
+            EXISTING="$(git ls-remote origin "$REF" | awk 'NR==1 {print $1}')"
+            if [[ -n "$EXISTING" && "$EXISTING" != "$ACK_SHA" ]]; then
+              echo "::error::Destination $REF already points to a different commit ($EXISTING)."
+              exit 1
+            fi
+            if [[ -z "$EXISTING" ]]; then
+              git push origin "$ACK_SHA:$REF"
+            fi
+          done
+          # Both permanent refs now retain the complete upstream ancestry.
+          git push origin ":$STAGING_REF"
+
+      - name: Record immutable import metadata
+        env:
+          ACK_SHA: ${{ steps.source.outputs.ack_sha }}
+          PUSH_COUNT: ${{ steps.publish.outputs.push_count }}
+          FIRST_PARENT_COUNT: ${{ steps.publish.outputs.first_parent_count }}
         run: |
           set -euo pipefail
           git fetch origin main
@@ -88,13 +198,13 @@ jobs:
           - Upstream: https://android.googlesource.com/kernel/common
           - Upstream branch: `android14-5.15-lts`
           - Imported commit: `$ACK_SHA`
-          - Commit count reachable from imported ref: $COMMIT_COUNT
-          - Tracked file count at imported tree: $FILE_COUNT
-          - Git objects reachable from imported ref: $OBJECT_COUNT
-          - Import method: full Git fetch and ref push; commit history and original commit IDs are preserved.
+          - First-parent commits traversed: $FIRST_PARENT_COUNT
+          - Incremental pushes: $PUSH_COUNT
+          - Import method: full Git fetch followed by sequential first-parent checkpoints below GitHub's single-push limit.
+          - Original upstream commit IDs, parent links and commit metadata are preserved.
           - Destination refs: `upstream/android14-5.15-lts` and `deen/bringup-ack515-base`
-          
-          This records an upstream source snapshot. It does not claim Deen support has been ported or that the kernel boots on the device.
+
+          This is a source import only. It does not claim Deen support has been ported or that the kernel boots on the device.
           EOF
           git add documentation/ACK_IMPORT_LOCK.md
           if ! git diff --cached --quiet; then
@@ -106,17 +216,15 @@ jobs:
 
       - name: Publish import summary
         env:
-          ACK_SHA: ${{ steps.fetch.outputs.ack_sha }}
-          COMMIT_COUNT: ${{ steps.fetch.outputs.commit_count }}
-          FILE_COUNT: ${{ steps.fetch.outputs.file_count }}
-          OBJECT_COUNT: ${{ steps.fetch.outputs.object_count }}
+          ACK_SHA: ${{ steps.source.outputs.ack_sha }}
+          PUSH_COUNT: ${{ steps.publish.outputs.push_count }}
+          FIRST_PARENT_COUNT: ${{ steps.publish.outputs.first_parent_count }}
         run: |
           {
-            echo "## Android Common Kernel 5.15 LTS import"
+            echo "## Android Common Kernel 5.15 LTS import completed"
             echo
-            echo "- Commit: `$ACK_SHA`"
-            echo "- Commits reachable: $COMMIT_COUNT"
-            echo "- Files in tree: $FILE_COUNT"
-            echo "- Git objects reachable: $OBJECT_COUNT"
-            echo "- Refs: `upstream/android14-5.15-lts`, `deen/bringup-ack515-base`"
+            echo "- Pinned commit: `$ACK_SHA`"
+            echo "- First-parent checkpoints: $FIRST_PARENT_COUNT"
+            echo "- Incremental Git pushes: $PUSH_COUNT"
+            echo "- Permanent refs: `upstream/android14-5.15-lts`, `deen/bringup-ack515-base`"
           } >> "$GITHUB_STEP_SUMMARY"
