@@ -121,6 +121,7 @@ jobs:
             --enable PINCTRL_MSM8953 \
             --enable RPMSG \
             --enable QCOM_SMD_RPM \
+            --enable QCOM_RPMPD \
             --enable SPMI \
             --enable SPMI_MSM_PMIC_ARB \
             --enable MFD_SPMI_PMIC \
@@ -142,7 +143,7 @@ jobs:
 
           for SYMBOL in \
             ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 \
-            RPMSG QCOM_SMD_RPM SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC \
+            RPMSG QCOM_SMD_RPM QCOM_RPMPD SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC \
             REGULATOR_QCOM_SMD_RPM REGULATOR_QCOM_SPMI REGULATOR_FIXED_VOLTAGE \
             MMC MMC_SDHCI MMC_SDHCI_PLTFM MMC_SDHCI_MSM KEYBOARD_GPIO; do
             grep -qx "CONFIG_${SYMBOL}=y" "$OUT/.config" || {
@@ -169,6 +170,7 @@ jobs:
             drivers/spmi/spmi-pmic-arb.o \
             drivers/mfd/qcom-spmi-pmic.o \
             drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
             drivers/regulator/qcom_smd-regulator.o \
             drivers/regulator/qcom_spmi-regulator.o \
             drivers/mmc/host/sdhci-msm.o \
@@ -180,6 +182,7 @@ jobs:
             drivers/spmi/spmi-pmic-arb.o \
             drivers/mfd/qcom-spmi-pmic.o \
             drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
             drivers/regulator/qcom_smd-regulator.o \
             drivers/regulator/qcom_spmi-regulator.o \
             drivers/mmc/host/sdhci-msm.o \
@@ -196,6 +199,7 @@ jobs:
             "$OUT/drivers/spmi/spmi-pmic-arb.o" \
             "$OUT/drivers/mfd/qcom-spmi-pmic.o" \
             "$OUT/drivers/soc/qcom/smd-rpm.o" \
+            "$OUT/drivers/soc/qcom/rpmpd.o" \
             "$OUT/drivers/regulator/qcom_smd-regulator.o" \
             "$OUT/drivers/regulator/qcom_spmi-regulator.o" \
             "$OUT/drivers/mmc/host/sdhci-msm.o" \
@@ -288,6 +292,7 @@ jobs:
             ${{ runner.temp }}/ack-out/drivers/spmi/spmi-pmic-arb.o
             ${{ runner.temp }}/ack-out/drivers/mfd/qcom-spmi-pmic.o
             ${{ runner.temp }}/ack-out/drivers/soc/qcom/smd-rpm.o
+            ${{ runner.temp }}/ack-out/drivers/soc/qcom/rpmpd.o
             ${{ runner.temp }}/ack-out/drivers/regulator/qcom_smd-regulator.o
             ${{ runner.temp }}/ack-out/drivers/regulator/qcom_spmi-regulator.o
             ${{ runner.temp }}/ack-out/drivers/mmc/host/sdhci-msm.o
