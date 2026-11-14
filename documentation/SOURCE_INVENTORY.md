@@ -72,3 +72,10 @@ These findings mean the SoC controller drivers can be reused, but the Deen board
 - Port only the required device files and dependencies; do not copy an entire vendor driver tree without API/Kconfig review.
 - Keep each workstream isolated in reviewable commits.
 - Do not import build outputs, private signing keys, device secrets, generated vendor blobs, SUSFS, NoMount, KernelSU, BakaSU or Magisk into the clean baseline.
+
+
+## External mainline Deen reference (not part of pinned ACK)
+
+Mainline added an initial Motorola One Deen DTS in commit `b62af30ebdb4ae4ec6230c5e39eea97f65b9f5ea` (2026-09-30): https://github.com/torvalds/linux/commit/b62af30ebdb4ae4ec6230c5e39eea97f65b9f5ea. The board file is `arch/arm64/boot/dts/qcom/msm8953-motorola-deen.dts` (blob `4bc407e23580b007873df85c988c9a764332a851`). The matching `motorola,deen` compatible binding was documented in commit `51c5d61ba73bde54d7900276cb1c0e37d416adfb`.
+
+This mainline DTS is a hardware/binding reference, not a drop-in file for ACK 5.15. The current Deen DTS was added after Linux v6.16 and references newer MSM8953 SoC/PMIC nodes; the pinned ACK has none of the MSM8953/PM8953/PMI8950 DTS base files. See `documentation/DEEN_MAINLINE_DTS_AUDIT.md` for the compatibility and phandle audit. No mainline DTS code has been copied into the 5.15 bring-up branch.
