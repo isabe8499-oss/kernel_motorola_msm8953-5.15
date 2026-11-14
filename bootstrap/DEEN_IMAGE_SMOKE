@@ -7,3 +7,6 @@ Trigger request: 2026-11-14T14:35:00-03:00.
 Initial retry adjustment (2026-11-14; superseded after exit 143): preserve CONFIG_LTO_CLANG_FULL=y and CONFIG_CFI_CLANG=y, provision a fixed 12 GiB swap file, serialize Make with -j1, and emit memory telemetry. The fixed-size swap and Make-only serialization were insufficient as a resource strategy and have been replaced by the bounded/LLD-serialized retry below. Kernel and DTS source content remain unchanged.
 
 Follow-up mitigation (2026-11-14): keep CONFIG_LTO_CLANG_FULL=y and CONFIG_CFI_CLANG=y; cap the LLD linker's own worker pool at one thread (the previous -j1 setting only serialized Make jobs); create at most 2–4 GiB swap only when filesystem headroom permits, instead of reserving a fixed 12 GiB; persist 30-second RAM, swap, PSI, cgroup and OOM-counter telemetry as an artifact. The retry uses a separate concurrency group to avoid being blocked by the stale prior run.
+
+
+LLD wrapper correction (2026-11-14): preserve the `ld.lld` executable alias when constructing the single-thread wrapper. Never use `readlink -f` for this alias, because it resolves to the generic `lld-18` driver and changes argv[0]. A tiny host ELF link is now required to pass before the full kernel LTO stage.
