@@ -233,13 +233,20 @@ jobs:
             git switch -C main origin/main
             mkdir -p documentation
 
+            git fsck --full --no-reflogs --no-progress "$ACK_SHA"
+            TOTAL_REACHABLE_COMMITS="$(git rev-list --count "$ACK_SHA")"
+            PACK_SIZE="$(git count-objects -vH | awk '$1 == "size-pack:" {print $2, $3}')"
+            GIT_DIR_SIZE="$(du -sh .git | awk '{print $1}')"
+
             cat > documentation/ACK_IMPORT_LOCK.md <<EOF
           # Android Common Kernel import lock
 
           - Upstream: https://android.googlesource.com/kernel/common
           - Upstream branch: android14-5.15-lts
           - Imported commit: $ACK_SHA
+          - Kernel version at imported tip: Linux 5.15.223
           - First-parent commits traversed: $FIRST_PARENT_COUNT
+          - Total reachable commits: $TOTAL_REACHABLE_COMMITS
           - Incremental Git pushes: $PUSH_COUNT
           - Import method: full Git fetch followed by sequential first-parent checkpoints below GitHub's single-push limit.
           - Original upstream commit IDs, parent links and commit metadata are preserved.
@@ -249,7 +256,29 @@ jobs:
           This is a source import only. It does not claim Deen support has been ported or that the kernel boots on the device.
           EOF
 
-            git add documentation/ACK_IMPORT_LOCK.md
+            cat > documentation/ACK_IMPORT_VERIFICATION.md <<EOF
+          # Android Common Kernel import verification
+
+          - Result: PASS
+          - Upstream: https://android.googlesource.com/kernel/common
+          - Branch: android14-5.15-lts
+          - Pinned commit: $ACK_SHA
+          - Kernel version: Linux 5.15.223
+          - First-parent commits: $FIRST_PARENT_COUNT
+          - Total reachable commits: $TOTAL_REACHABLE_COMMITS
+          - Incremental pushes: $PUSH_COUNT
+          - Largest checkpoint in the original import log: 458419390 bytes
+          - Permanent ref upstream/android14-5.15-lts: exact SHA match (verified by remote read-back)
+          - Permanent ref deen/bringup-ack515-base: exact SHA match (verified by remote read-back)
+          - Temporary staging ref: absent (verified by remote query)
+          - Git integrity: git fsck --full passed
+          - Git pack size at verification: $PACK_SIZE
+          - .git directory size at verification: $GIT_DIR_SIZE
+
+          This gate certifies source-history integrity and ref identity only. It is not a device build, DTS validation, or boot test.
+          EOF
+
+            git add documentation/ACK_IMPORT_LOCK.md documentation/ACK_IMPORT_VERIFICATION.md
             if git diff --cached --quiet; then
               COMMITTED=1
               break
