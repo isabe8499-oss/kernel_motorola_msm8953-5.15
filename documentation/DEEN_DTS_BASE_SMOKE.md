@@ -2,7 +2,7 @@
 
 - Result: FAIL
 - Branch: deen/dts-bringup
-- Branch commit: 06e98fd1484cd28819e7fc22bf9eca8e5e6bf657
+- Branch commit: d86ecf2fa95fe3635b4ffc606fdd39b048760d1e
 - SoC DTSI source: Linux v6.1, blob 6b992a6d56c16d5151785df04fa2053c67ee7fad
 - PMIC DTSI source: Linux v6.1, blob a1d36f9ebbd259e41a80e3af516d9a044419afe0
 - ACK base: Android Common Kernel 5.15 LTS
@@ -105,27 +105,15 @@ ruamel.yaml.scanner.ScannerError: mapping values are not allowed here
                                          ^ (line: 1)
 
 ## Last backported rpmpd object build log lines
-  HDRINST usr/include/asm/sigcontext.h
-  HDRINST usr/include/asm/kvm.h
-  HDRINST usr/include/asm/ptrace.h
-  HDRINST usr/include/asm/sve_context.h
-  HDRINST usr/include/asm/fcntl.h
-  HDRINST usr/include/asm/perf_regs.h
-  HDRINST usr/include/asm/param.h
-  HDRINST usr/include/asm/bitsperlong.h
-  HDRINST usr/include/asm/hwcap.h
-  HDRINST usr/include/asm/signal.h
-  HDRINST usr/include/asm/posix_types.h
-  HDRINST usr/include/asm/bpf_perf_event.h
-  HDRINST usr/include/asm/ucontext.h
-  HDRINST usr/include/asm/statfs.h
-  HDRINST usr/include/asm/auxvec.h
   HDRINST usr/include/asm/unistd.h
+  LD      /home/runner/work/_temp/deen-out/tools/bpf/resolve_btfids/libsubcmd/libsubcmd-in.o
   HDRINST usr/include/asm/socket.h
   HDRINST usr/include/asm/siginfo.h
+  AR      /home/runner/work/_temp/deen-out/tools/bpf/resolve_btfids/libsubcmd/libsubcmd.a
   HDRINST usr/include/asm/kvm_para.h
   HDRINST usr/include/asm/termbits.h
   HDRINST usr/include/asm/errno.h
+  LINK     resolve_btfids
   HDRINST usr/include/asm/shmbuf.h
   HDRINST usr/include/asm/swab.h
   HDRINST usr/include/asm/poll.h
@@ -137,8 +125,20 @@ ruamel.yaml.scanner.ScannerError: mapping values are not allowed here
   HDRINST usr/include/asm/stat.h
   HDRINST usr/include/asm/sockios.h
   HDRINST usr/include/asm/types.h
+  HOSTCC  scripts/genksyms/genksyms.o
   HDRINST usr/include/asm/termios.h
   HDRINST usr/include/asm/ioctls.h
+  YACC    scripts/genksyms/parse.tab.[ch]
+  LEX     scripts/genksyms/lex.lex.c
+  HOSTCC  scripts/selinux/genheaders/genheaders
+  HOSTCC  scripts/genksyms/parse.tab.o
+  HOSTCC  scripts/selinux/mdp/mdp
+  HOSTCC  scripts/genksyms/lex.lex.o
+  HOSTCC  scripts/kallsyms
+  HOSTLD  scripts/genksyms/genksyms
+  HOSTCC  scripts/sorttable
+  HOSTCC  scripts/asn1_compiler
+  HOSTCC  scripts/sign-file
   HOSTCC  scripts/extract-cert
   GEN     arch/arm64/include/generated/asm/cpucaps.h
   CC      scripts/mod/empty.o
