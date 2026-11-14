@@ -28,7 +28,7 @@ The corresponding Makefiles register the clock and pinctrl drivers. This is usef
 
 ## 3. Gaps found in the pinned ACK tree
 
-A recursive Git tree inspection found no Deen board DTS, no MSM8953 SoC DTSI under arch/arm64/boot/dts/qcom, and no Motorola Deen defconfig. The qcom DTB Makefile does not yet register an MSM8953 target.
+A recursive Git tree inspection of the pinned upstream ACK confirmed no Deen board DTS, no MSM8953 SoC DTSI under arch/arm64/boot/dts/qcom, and no Motorola Deen defconfig. These gaps are now addressed partially on the isolated deen/dts-bringup branch; they remain absent from the immutable upstream ref.
 
 The upstream ACK tree also does not contain the donor's downstream KGSL tree (drivers/gpu/msm) or Motorola's techpack camera/audio legacy trees. Those are significant Android vendor-kernel integration gaps, not small DTS-only omissions.
 
@@ -51,23 +51,25 @@ The donor's defconfig and DTS files are reference material only. Do not copy its
 
 ## 5. Existing scratch branch
 
-Branch deen/dts-bringup is based directly on the pinned ACK commit and is three commits ahead. Its current delta is limited to:
+Branch deen/dts-bringup is based on the pinned ACK commit. It now contains:
 
-- arch/arm64/boot/dts/qcom/msm8953.dtsi
-- arch/arm64/boot/dts/qcom/pm8953.dtsi
-- documentation/DTS_SOURCE_PROVENANCE.md
+- unchanged Linux v6.1 msm8953.dtsi and pm8953.dtsi reference imports;
+- a minimal Deen common DTSI with QSEE reserved-memory adjustment, PM8953 RPM regulator mapping, volume keys and primary eMMC;
+- separate PVT1/PVT2 board wrappers with board IDs 0x4D 0xC100 and 0x4D 0xC200;
+- MSM8953 RPM power-domain IDs, driver descriptor and bindings backported from v6.1;
+- the minimal motorola,deen compatible binding.
 
-The two DTSI files are documented as unchanged reference imports from torvalds/linux v6.1. They are SoC/PMIC starting points, not a Deen board description. They are not yet registered in the ACK 5.15 DTB Makefile, and no dtbs/dtbs_check result has been recorded. Treat this branch as experimental, not bootable.
+CI run 43620086484 compiled the base fixture and both PVT candidate DTBs. dt-doc-validate, schema generation and targeted dt-validate all returned exit code 0; the backported rpmpd.o also compiled. The branch is still an experimental minimal board description, not a complete or bootable Deen tree.
 
 ## 6. Next-phase plan and acceptance criteria
 
-### Phase A — Validate the SoC DTSI backport
-1. Review every include, label, compatible string, clock/reset/power-domain reference and binding used by msm8953.dtsi and pm8953.dtsi against ACK 5.15.
-2. Identify properties/bindings introduced after 5.15; replace only with 5.15-supported equivalents, with provenance recorded.
-3. Run dtc compilation and dtbs_check against the ACK 5.15 tree. Resolve all errors and document warnings individually.
-4. Add the SoC DTSI to the DT build only after source review and checks pass.
+### Phase A — SoC DTSI, bindings and minimal board syntax/schema: PASS
+1. The imported v6.1 MSM8953/PM8953 DTSI files are integrated on the isolated Deen branch.
+2. The Deen QSEE reservation, PM8953 RPM rails, volume keys, primary eMMC and two PVT wrappers are present.
+3. The MSM8953 RPM power-domain driver and dt-bindings were selectively backported with provenance.
+4. CI run 43620086484 compiled the synthetic base fixture and PVT1/PVT2 DTBs, passed dt-doc-validate, processed schema generation and targeted dt-validate, and compiled the branch rpmpd.o.
 
-### Phase B — Build a Deen board description
+### Phase B — Full kernel link and Deen board description
 1. Compare both PVT1/PVT2 donor DTS files and board IDs; determine exact XT1941-3 hardware revision using available device/bootloader evidence.
 2. Port the board root DTS and peripheral DTSI files selectively, not as a bulk copy.
 3. Validate regulator, reserved-memory, SPMI/PMIC, clocks, interconnect, pinctrl, storage, display, touchscreen, sensors, thermal and charger descriptions against 5.15 bindings.
@@ -89,7 +91,7 @@ The two DTSI files are documented as unchanged reference imports from torvalds/l
 
 ## 7. Current decision
 
-The source import is approved. The Deen port is not yet approved for a full kernel build or device flash. The next safe task is Phase A: a controlled 5.15 compatibility audit and build validation of the two SoC/PMIC DTSI reference files on deen/dts-bringup.
+The source import, ACK config/object smoke and minimal Deen DTS compile/schema smoke are approved. A full generic-GKI Image link with MSM8953 options and the two Deen candidate DTBs is now running as a separate CI gate. The Deen-specific defconfig, complete peripheral stack, boot-image packaging and device boot are not approved.
 
 No device drivers have been copied into the upstream branch, no donor branch has been modified, and no flashable artifact is claimed.
 
