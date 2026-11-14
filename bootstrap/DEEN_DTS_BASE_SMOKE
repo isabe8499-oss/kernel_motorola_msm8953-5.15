@@ -2,4 +2,4 @@
 
 Compile a runtime-generated minimal DTS that includes the imported Linux v6.1 msm8953.dtsi and pm8953.dtsi against the clean ACK 5.15 branch deen/dts-bringup. The fixture is CI-only and must never be used as a flashable Deen DTB.
 
-Trigger request: 2026-11-14T12:20:00-03:00. Compile the synthetic base fixture plus both PVT1 and PVT2 board candidates.
+Trigger request: 2026-11-14T13:00:00-03:00. Compile base fixture plus PVT1/PVT2 and run dt_binding_check/dtbs_check against qcom.yaml.
