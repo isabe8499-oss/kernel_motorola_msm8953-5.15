@@ -1,3 +1,5 @@
 # ACK config smoke request
 
 Run gki_defconfig + olddefconfig on pinned ACK android14-5.15-lts SHA 5cb316cf9d39318326075731e4e0c39b725d9c99, enable MSM8953 GCC and pinctrl, compile gcc-msm8953.o and pinctrl-msm8953.o with LLVM 18, and publish a PASS/FAIL report. This is not a full kernel or device build.
+
+Trigger request: 2026-11-14T12:05:00-03:00.
