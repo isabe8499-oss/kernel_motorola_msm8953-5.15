@@ -1,0 +1,93 @@
+name: Independently verify ACK 5.15 LTS import
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "documentation/ACK_IMPORT_LOCK.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-import:
+    name: Verify permanent refs and Git object integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify source lock, permanent refs, staging cleanup and history
+        env:
+          EXPECTED_ACK_SHA: 5cb316cf9d39318326075731e4e0c39b725d9c99
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          grep -F -- "$EXPECTED_ACK_SHA" documentation/ACK_IMPORT_LOCK.md >/dev/null || {
+            echo "::error::The import lock does not contain the expected upstream SHA."
+            exit 1
+          }
+
+          verify_ref() {
+            local remote_ref="$1"
+            local local_ref="$2"
+            local remote_sha
+            local fetched_sha
+
+            remote_sha="$(git ls-remote origin "$remote_ref" | awk 'NR == 1 {print $1}')"
+            if [[ "$remote_sha" != "$EXPECTED_ACK_SHA" ]]; then
+              echo "::error::$remote_ref points to '$remote_sha', expected $EXPECTED_ACK_SHA."
+              exit 1
+            fi
+
+            git fetch --no-tags origin "$remote_ref:$local_ref"
+            fetched_sha="$(git rev-parse "$local_ref^{commit}")"
+            if [[ "$fetched_sha" != "$EXPECTED_ACK_SHA" ]]; then
+              echo "::error::Fetched $remote_ref resolved to $fetched_sha, expected $EXPECTED_ACK_SHA."
+              exit 1
+            fi
+            echo "Verified $remote_ref -> $fetched_sha"
+          }
+
+          verify_ref \
+            "refs/heads/upstream/android14-5.15-lts" \
+            "refs/remotes/verify/upstream/android14-5.15-lts"
+
+          verify_ref \
+            "refs/heads/deen/bringup-ack515-base" \
+            "refs/remotes/verify/deen/bringup-ack515-base"
+
+          STAGING_SHA="$(git ls-remote origin "refs/heads/import/staging-android14-5.15-lts" | awk 'NR == 1 {print $1}')"
+          if [[ -n "$STAGING_SHA" ]]; then
+            echo "::error::Temporary staging ref still exists at $STAGING_SHA."
+            exit 1
+          fi
+
+          git cat-file -e "$EXPECTED_ACK_SHA^{commit}"
+          git fsck --full --no-reflogs --no-progress "$EXPECTED_ACK_SHA"
+
+          FIRST_PARENT_COUNT="$(git rev-list --first-parent --count "$EXPECTED_ACK_SHA")"
+          TOTAL_REACHABLE_COMMITS="$(git rev-list --count "$EXPECTED_ACK_SHA")"
+          REPOSITORY_DISK_SIZE="$(du -sh .git | awk '{print $1}')"
+          PACK_SIZE="$(git count-objects -vH | awk '$1 == "size-pack:" {print $2, $3}')"
+
+          {
+            echo "## ACK 5.15 LTS import independently verified"
+            echo
+            echo "- Pinned upstream SHA: $EXPECTED_ACK_SHA"
+            echo "- upstream/android14-5.15-lts: exact SHA match"
+            echo "- deen/bringup-ack515-base: exact SHA match"
+            echo "- Temporary staging ref: absent"
+            echo "- First-parent commits: $FIRST_PARENT_COUNT"
+            echo "- Reachable commits: $TOTAL_REACHABLE_COMMITS"
+            echo "- Git pack size: $PACK_SIZE"
+            echo "- Checked-out .git size: $REPOSITORY_DISK_SIZE"
+            echo "- git fsck --full: passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "ACK source import passed independent remote-ref and object-integrity verification."
