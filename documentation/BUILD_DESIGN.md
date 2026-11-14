@@ -11,8 +11,8 @@
 ## CI phases
 
 1. **Source gate — PASS:** exact ACK SHA, both permanent ref identities, staging cleanup and git fsck --full are recorded in ACK_IMPORT_VERIFICATION.md.
-2. **ACK config/object smoke — running by workflow:** gki_defconfig, olddefconfig, enable only MSM8953 GCC and pinctrl, then compile gcc-msm8953.o and pinctrl-msm8953.o using Clang 18. The result is recorded only after those checks pass.
-3. **DTS validation — initial candidate pending:** compile a synthetic MSM8953/PM8953 base fixture and the PVT1/PVT2 Deen candidate DTBs on `deen/dts-bringup`. This proves syntax/DTB generation only; schema, memory reservations and device behaviour require later checks.
+2. **ACK config/object smoke — PASS:** gki_defconfig, olddefconfig, 10 MSM8953/PMIC/SPMI/RPM/SDHCI/GPIO-key objects compiled using Clang/LLD 18. See `ACK_BASE_CONFIG_SMOKE.md`.
+3. **DTS validation — compile/schema PASS:** CI run 43620086484 compiled the synthetic base fixture and both PVT1/PVT2 candidates; `dt-doc-validate`, schema generation and targeted `dt-validate` passed. This is not a boot or runtime test.
 4. **SoC/board validation:** add storage, regulators, clocks, pinctrl, thermal and serial console in a dependency-ordered way.
 5. **Kernel build:** build Image and required modules/DTBs with pinned LLVM/Clang and complete artifacts.
 6. **Boot integration:** disabled until the target ROM's boot/vendor_boot/dtbo layout is measured and the rollback path is tested.
@@ -29,6 +29,6 @@ GitHub-hosted standard runners may not have sufficient disk or time for repeated
 
 - Full ACK source history: imported and integrity-verified.
 - MSM8953 GCC and pinctrl drivers: present in ACK and targeted by the object smoke.
-- Deen base/board DTSI and PVT1/PVT2 candidate files: drafted on `deen/dts-bringup`; CI DTB compilation result not yet recorded.
+- Deen base/board DTSI and PVT1/PVT2 candidates: compiled and schema-validated in CI; actual board revision, runtime behavior and flash packaging remain unverified.
 - Deen defconfig, Image, DTB/DTBO, modules and boot image: not yet created.
 - No device flashing is authorized before the boot layout, correct PVT board ID and rollback path are recorded.
