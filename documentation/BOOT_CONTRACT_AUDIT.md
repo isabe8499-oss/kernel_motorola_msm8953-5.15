@@ -23,6 +23,14 @@ The Android 15 BoardConfig additionally specifies:
 
 The Lineage 19.1 tree separately points at device/motorola/deen-kernel and packages Image.gz-dtb as the local kernel. The Lineage 21/wip reference still targets Linux 3.18. The Android 15 reference targets Linux 4.19. None of these references establishes existing Deen 5.15 support.
 
+## Device Tree padding requirement from the 4.19 donor
+
+The clean Deen 4.19 donor's Motorola DTS Makefile sets:
+
+    DTC_FLAGS += -p 1024
+
+Its comment says the extra 1 KiB allows runtime bootloader additions to /chosen. This setting is not automatically required by ACK 5.15 or by every boot image path. Before producing Image.gz-dtb or a boot image, compare the stock DTB size, bootloader behavior and target ROM packaging; then decide whether equivalent 1,024-byte padding is required. The current 5.15 DTB smoke validates DTB structure/schema, not bootloader append space.
+
 ## Android 15 reference fstab
 
 The checked Android 15 tree uses:
