@@ -1,0 +1,30 @@
+name: ACK 5.15 source and Deen port audit
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "documentation/**"
+      - "UPSTREAM_BASE.md"
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout project metadata
+        uses: actions/checkout@v4
+      - name: Verify pinned source and donor references
+        env:
+          ACK_SHA: a9ee5509a0c552cb7bd7846b03b538dc2cba7585
+        run: |
+          set -euo pipefail
+          grep -q "$ACK_SHA" UPSTREAM_BASE.md
+          grep -q "kernel_motorola_msm8953-22" documentation/SOURCE_INVENTORY.md
+          grep -q "kernel_motorola_msm8953" documentation/SOURCE_INVENTORY.md
+          grep -q "MSM8953" documentation/PORTING_MATRIX.md
+          echo "ACK reference and Deen inventory are present."
