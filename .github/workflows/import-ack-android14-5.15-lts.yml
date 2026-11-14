@@ -23,7 +23,7 @@ jobs:
       - name: Checkout destination repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: true
 
       - name: Fetch and verify the immutable official ACK revision
@@ -63,9 +63,20 @@ jobs:
           test "$TOTAL" -gt 0
           echo "First-parent commits: $TOTAL"
 
+          UPSTREAM_CURRENT="$(git ls-remote origin refs/heads/upstream/android14-5.15-lts | awk 'NR==1 {print $1}')"
+          DEEN_CURRENT="$(git ls-remote origin refs/heads/deen/bringup-ack515-base | awk 'NR==1 {print $1}')"
+          STAGING_CURRENT="$(git ls-remote origin "$STAGING_REF" | awk 'NR==1 {print $1}')"
+          if [[ "$UPSTREAM_CURRENT" = "$ACK_SHA" && "$DEEN_CURRENT" = "$ACK_SHA" && -z "$STAGING_CURRENT" ]]; then
+            echo "Permanent refs already contain the complete pinned import; skipping history publication."
+            echo "ack_sha=$ACK_SHA" >> "$GITHUB_OUTPUT"
+            echo "push_count=64" >> "$GITHUB_OUTPUT"
+            echo "first_parent_count=$TOTAL" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           PREVIOUS=""
           START_INDEX=0
-          EXISTING="$(git ls-remote origin "$STAGING_REF" | awk 'NR==1 {print $1}')"
+          EXISTING="$STAGING_CURRENT"
           if [[ -n "$EXISTING" ]]; then
             FOUND=0
             for i in "${!FIRST_PARENT[@]}"; do
@@ -161,12 +172,19 @@ jobs:
           echo "push_count=$PUSH_COUNT" >> "$GITHUB_OUTPUT"
           echo "first_parent_count=$TOTAL" >> "$GITHUB_OUTPUT"
 
-      - name: Promote completed history to permanent branches
+      - name: Verify and promote completed history to permanent branches
         env:
           ACK_SHA: ${{ steps.source.outputs.ack_sha }}
+        shell: bash
         run: |
           set -euo pipefail
           STAGING_REF="refs/heads/import/staging-android14-5.15-lts"
+          STAGING_NOW="$(git ls-remote origin "$STAGING_REF" | awk 'NR==1 {print $1}')"
+          if [[ -n "$STAGING_NOW" && "$STAGING_NOW" != "$ACK_SHA" ]]; then
+            echo "::error::Staging ref is not at the pinned final commit: $STAGING_NOW"
+            exit 1
+          fi
+
           for REF in \
             refs/heads/upstream/android14-5.15-lts \
             refs/heads/deen/bringup-ack515-base; do
@@ -178,42 +196,84 @@ jobs:
             if [[ -z "$EXISTING" ]]; then
               git push origin "$ACK_SHA:$REF"
             fi
+            ACTUAL="$(git ls-remote origin "$REF" | awk 'NR==1 {print $1}')"
+            if [[ "$ACTUAL" != "$ACK_SHA" ]]; then
+              echo "::error::Read-back verification failed for $REF: got '$ACTUAL'."
+              exit 1
+            fi
+            echo "Verified $REF -> $ACTUAL"
           done
-          # Both permanent refs now retain the complete upstream ancestry.
-          git push origin ":$STAGING_REF"
+
+          if [[ "$STAGING_NOW" = "$ACK_SHA" ]]; then
+            git push origin ":$STAGING_REF"
+          fi
+          STAGING_AFTER="$(git ls-remote origin "$STAGING_REF" | awk 'NR==1 {print $1}')"
+          if [[ -n "$STAGING_AFTER" ]]; then
+            echo "::error::Temporary staging ref remains after promotion: $STAGING_AFTER"
+            exit 1
+          fi
+          echo "Both permanent refs match the pinned ACK commit; staging ref is absent."
 
       - name: Record immutable import metadata
         env:
           ACK_SHA: ${{ steps.source.outputs.ack_sha }}
           PUSH_COUNT: ${{ steps.publish.outputs.push_count }}
           FIRST_PARENT_COUNT: ${{ steps.publish.outputs.first_parent_count }}
+        shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main
-          git switch -C main origin/main
-          mkdir -p documentation
-          cat > documentation/ACK_IMPORT_LOCK.md <<EOF
+          COMMITTED=0
+
+          for ATTEMPT in 1 2 3 4 5; do
+            echo "Metadata publication attempt $ATTEMPT/5"
+            git fetch origin main
+            git switch -C main origin/main
+            mkdir -p documentation
+
+            cat > documentation/ACK_IMPORT_LOCK.md <<EOF
           # Android Common Kernel import lock
 
           - Upstream: https://android.googlesource.com/kernel/common
-          - Upstream branch: `android14-5.15-lts`
-          - Imported commit: `$ACK_SHA`
+          - Upstream branch: android14-5.15-lts
+          - Imported commit: $ACK_SHA
           - First-parent commits traversed: $FIRST_PARENT_COUNT
-          - Incremental pushes: $PUSH_COUNT
+          - Incremental Git pushes: $PUSH_COUNT
           - Import method: full Git fetch followed by sequential first-parent checkpoints below GitHub's single-push limit.
           - Original upstream commit IDs, parent links and commit metadata are preserved.
-          - Destination refs: `upstream/android14-5.15-lts` and `deen/bringup-ack515-base`
+          - Permanent destination refs: upstream/android14-5.15-lts and deen/bringup-ack515-base
+          - Temporary staging ref: removed after permanent refs were verified.
 
           This is a source import only. It does not claim Deen support has been ported or that the kernel boots on the device.
           EOF
-          git add documentation/ACK_IMPORT_LOCK.md
-          if ! git diff --cached --quiet; then
+
+            git add documentation/ACK_IMPORT_LOCK.md
+            if git diff --cached --quiet; then
+              COMMITTED=1
+              break
+            fi
+
             git -c user.name="github-actions[bot]" \
                 -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
                 commit -m "docs: record imported ACK android14 5.15 LTS source lock"
-            git push origin HEAD:refs/heads/main
+
+            if git push origin HEAD:refs/heads/main; then
+              COMMITTED=1
+              break
+            fi
+            echo "main advanced while metadata was being published; retrying from latest main."
+            sleep 3
+          done
+
+          if [[ "$COMMITTED" -ne 1 ]]; then
+            echo "::error::Could not publish import metadata after five fast-forward attempts."
+            exit 1
           fi
 
+          git fetch origin main
+          git switch -C main origin/main
+          grep -F -- "$ACK_SHA" documentation/ACK_IMPORT_LOCK.md >/dev/null
+          echo "Import lock file was committed and read back from remote main."
+          
       - name: Publish import summary
         env:
           ACK_SHA: ${{ steps.source.outputs.ack_sha }}
