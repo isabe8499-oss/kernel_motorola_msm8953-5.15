@@ -57,17 +57,17 @@ It does not yet enable display, touchscreen, camera, fingerprint, NFC, WLAN, Blu
 
 The ACK configuration smoke has compiled the MSM8953 GCC, pinctrl, SMD RPM and RPM power-domain objects, plus PMIC, regulator, SDHCI and GPIO-key objects. The backported `drivers/soc/qcom/rpmpd.o` in the Deen working tree also compiled successfully in the DTS smoke job.
 
-The three DTS candidates (a CI-only base fixture, PVT1 and PVT2) compiled with Clang 18. The first schema-validation attempts failed because the workflow mixed `dt-mk-schema` diagnostics into the generated JSON file. The workflow was corrected to generate from the complete bindings directory, keep stderr in a separate log, and parse-check the JSON before `dt-validate`. The rerun is pending; do not record schema validation as passed until that run completes.
+The three DTS candidates (a CI-only base fixture, PVT1 and PVT2) compiled with Clang 18 in CI run 43620086484. `dt-doc-validate`, processed-schema generation and targeted `dt-validate` all returned exit code 0; the Deen branch's backported MSM8953 `rpmpd.o` also compiled. The run uploaded artifact `deen-msm8953-base-dts-smoke` (artifact ID 14123732376).
 
-A successful DTS syntax compile is not a kernel image build, a DT schema pass, a board-ID match, or a boot test.
+This is a successful syntax and binding-schema gate, not a kernel Image link, a physical board-ID match, an electrical test or a boot test.
 
 ## Next gated steps
 
-1. Obtain a clean pass from the pinned dtschema workflow.
-2. Verify the handset PVT/board ID against stock bootloader/FDT data.
+1. Complete the generic-GKI full Image link and both PVT DTB build currently running in CI.
+2. Verify the handset PVT/board ID using the read-only gate in `documentation/HARDWARE_IDENTIFICATION_GATE.md`.
 3. Compare the Deen donor's display, touchscreen, storage, regulator, thermal, NFC, Wi-Fi, camera, audio and fingerprint nodes against upstream 5.15 drivers and bindings one subsystem at a time.
-4. Port only the nodes whose drivers and dependencies exist or have an independently reviewed backport.
-5. Run targeted DT schema validation and object/config compilation for each subsystem.
-6. Only after a complete kernel + DTB build, boot-image integration and recovery path exist should device boot testing be considered.
+4. Port only nodes whose drivers and dependencies exist or have an independently reviewed backport.
+5. Create a Deen-specific defconfig from the pinned ACK Kconfig and run full Image/DTB/module builds.
+6. Only after boot-image integration and a tested recovery path exist should device boot testing be considered.
 
 No SUSFS, NoMount, KernelSU, Magisk or root integration is part of this base.
