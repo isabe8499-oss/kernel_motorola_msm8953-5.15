@@ -93,14 +93,22 @@ jobs:
             NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 \
-            qcom/msm8953-deen-base-smoke.dtb 2>&1 | tee "$RUNNER_TEMP/dts-build.log"
+            qcom/msm8953-deen-base-smoke.dtb \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb 2>&1 | tee "$RUNNER_TEMP/dts-build.log"
           DTS_STATUS=${PIPESTATUS[0]}
           set -e
 
-          DTS_SHA="not-built"
-          DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb"
-          if [[ "$DTS_STATUS" -eq 0 && -s "$DTB" ]]; then
-            DTS_SHA="$(sha256sum "$DTB" | awk '{print $1}')"
+          BASE_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb"
+          PVT1_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          PVT2_DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+          BASE_SHA="not-built"
+          PVT1_SHA="not-built"
+          PVT2_SHA="not-built"
+          if [[ "$DTS_STATUS" -eq 0 && -s "$BASE_DTB" && -s "$PVT1_DTB" && -s "$PVT2_DTB" ]]; then
+            BASE_SHA="$(sha256sum "$BASE_DTB" | awk '{print $1}')"
+            PVT1_SHA="$(sha256sum "$PVT1_DTB" | awk '{print $1}')"
+            PVT2_SHA="$(sha256sum "$PVT2_DTB" | awk '{print $1}')"
           else
             DTS_STATUS=1
           fi
@@ -121,7 +129,9 @@ jobs:
             echo "- ACK base: Android Common Kernel 5.15 LTS"
             echo "- Compiler: $CLANG_VERSION"
             echo "- Test: generated minimal DTS includes msm8953.dtsi and pm8953.dtsi"
-            echo "- DTB SHA-256: $DTS_SHA"
+            echo "- Base-only fixture DTB SHA-256: $BASE_SHA"
+            echo "- Deen PVT1 DTB SHA-256 (board ID 0x4D 0xC100): $PVT1_SHA"
+            echo "- Deen PVT2 DTB SHA-256 (board ID 0x4D 0xC200): $PVT2_SHA"
             echo
             echo "This is only a base-DTS syntax/include smoke test. It has no Deen PVT board ID or peripheral enablement and is not a flashable device tree."
           } > "$RUNNER_TEMP/DEEN_DTS_BASE_SMOKE.md"
@@ -146,6 +156,8 @@ jobs:
             ${{ runner.temp }}/DEEN_DTS_BASE_SMOKE.md
             ${{ runner.temp }}/dts-build.log
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-deen-base-smoke.dtb
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
             ${{ runner.temp }}/deen-out/.config
           if-no-files-found: warn
 
