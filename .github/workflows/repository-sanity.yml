@@ -22,7 +22,7 @@ jobs:
           test -s documentation/PORTING_MATRIX.md
           test -s documentation/VALIDATION_PLAN.md
           grep -q 'android14-5.15' documentation/SOURCE_INVENTORY.md
-          grep -q 'MSM_GCC_8953' documentation/PORTING_MATRIX.md
+          grep -q 'MSM8953 GCC' documentation/PORTING_MATRIX.md
           grep -q 'motorola,deen' documentation/DEEN_MAINLINE_DTS_AUDIT.md
           test -s documentation/ACK_IMPORT_VERIFICATION.md
           echo "Documentation inventory checks passed."
