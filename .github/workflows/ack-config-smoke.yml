@@ -44,6 +44,21 @@ jobs:
             python3 python3-dev dwarves binutils-aarch64-linux-gnu \
             clang-18 lld-18 llvm-18
 
+      - name: Add versioned LLVM tools to the generic tool names expected by Kbuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/llvm-bin"
+          for TOOL in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+            VERSIONED="$TOOL-18"
+            if command -v "$VERSIONED" >/dev/null 2>&1; then
+              ln -sf "$(command -v "$VERSIONED")" "$RUNNER_TEMP/llvm-bin/$TOOL"
+            fi
+          done
+          echo "$RUNNER_TEMP/llvm-bin" >> "$GITHUB_PATH"
+          command -v ld.lld
+          ld.lld --version
+
       - name: Fetch and verify the exact ACK source revision
         shell: bash
         run: |
@@ -193,7 +208,7 @@ jobs:
 
           $OBJECT_HASHES
 
-          This is a configuration and two-object compile smoke test only. It is not a full Image/DTB build, Deen device build, ABI validation or boot test.
+          This is a configuration and selected SoC/controller object compile smoke test only. It is not a full Image/DTB build, Deen device build, ABI validation or boot test.
           EOF
 
           cat "$RUNNER_TEMP/ACK_BASE_CONFIG_SMOKE.md" >> "$GITHUB_STEP_SUMMARY"
