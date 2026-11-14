@@ -34,6 +34,7 @@ description: |
         msm8226
         msm8916
         msm8974
+        msm8953
         msm8992
         msm8994
         msm8996
@@ -239,6 +240,11 @@ properties:
               - qcom,sm8350-hdk
               - qcom,sm8350-mtp
           - const: qcom,sm8350
+
+      - items:
+          - enum:
+              - motorola,deen
+          - const: qcom,msm8953
 
 additionalProperties: true
 
