@@ -5,6 +5,11 @@ on:
     branches: ["main"]
     paths:
       - "documentation/ACK_IMPORT_LOCK.md"
+  workflow_run:
+    workflows:
+      - Import full Android Common Kernel 14-5.15 LTS history
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -12,6 +17,7 @@ permissions:
 
 jobs:
   verify-import:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     name: Verify permanent refs and Git object integrity
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -19,6 +25,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 1
 
       - name: Verify source lock, permanent refs, staging cleanup and history
