@@ -6,3 +6,5 @@ This marker triggers the repository workflow that fetches the full upstream Git 
 - Expected immutable commit: 5cb316cf9d39318326075731e4e0c39b725d9c99
 
 The workflow must verify the expected commit before pushing. If upstream advances before the workflow runs, it stops instead of silently importing a different snapshot.
+
+Retry: incremental push chunks below 1.3 GB, with resumable first-parent checkpoints. Request timestamp: 2026-11-14T10:25:00-03:00.
