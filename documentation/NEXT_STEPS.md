@@ -23,10 +23,11 @@
 
 ## Gate 3 — MSM8953 Device Tree foundation
 
-1. Use `documentation/DEEN_MAINLINE_DTS_AUDIT.md` to select the minimum MSM8953/PMIC nodes to backport to ACK 5.15.
-2. Port and compile the SoC DTS, PM8953/PMI8950 nodes and Deen board nodes; resolve every external phandle.
-3. Preserve PVT1/PVT2 as separate board candidates until hardware revision is identified.
-4. Run dtc and schema checks; review warnings and verify memory/reserved-memory, regulators, clocks, pinctrl, interrupts and eMMC.
+1. The isolated `deen/dts-bringup` branch now carries unchanged v6.1 `msm8953.dtsi`/`pm8953.dtsi` plus a minimal shared Deen DTSI and PVT1/PVT2 wrappers.
+2. Run the CI base fixture and both candidate DTBs; record compiler output and hashes before further expansion.
+3. Resolve any dtc failures; then add and audit the device-specific memory/reserved-memory and console requirements from the clean donor.
+4. Preserve both PVT candidates until the handset board ID is identified. Do not flash either candidate.
+5. Run dtc and schema checks; review warnings and verify regulators, clocks, pinctrl, interrupts and eMMC.
 
 ## Gate 4 — Minimal Deen kernel configuration
 
