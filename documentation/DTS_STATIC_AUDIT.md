@@ -9,7 +9,7 @@ Branch: `deen/dts-bringup`
 |---|---|---:|
 | `arch/arm64/boot/dts/qcom/msm8953.dtsi` | `6b992a6d56c16d5151785df04fa2053c67ee7fad` | 28,216 bytes |
 | `arch/arm64/boot/dts/qcom/pm8953.dtsi` | `a1d36f9ebbd259e41a80e3af516d9a044419afe0` | 1,983 bytes |
-| `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-common.dtsi` | `68f287263619cf32dd6d0adf182edce259a38461` | 4,182 bytes |
+| `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-common.dtsi` | `3f9b941d2b609727b32b47481272378601bf286d` | 4,795 bytes |
 | `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts` | `f5b97d8e3d855aca47ba511a0f2d0ef9d413f513` | 474 bytes |
 | `arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts` | `c0fcd9d9c9c4c33bc46d303d564aae85f84613a3` | 474 bytes |
 
@@ -19,11 +19,11 @@ The ACK 5.15 `Documentation/devicetree/bindings/arm/qcom.yaml` predates the MSM8
 
 ## Reserved-memory layout
 
-The Deen common DTSI now moves QSEE to the mainline/donor Deen region at 0x84300000 (32 MiB), deletes the overlapping inherited 0x85b00000 (8 MiB) region and removes the initial continuous-splash reservation at 0x90001000. The complete address/size arithmetic and deferred vendor memory regions are recorded in `documentation/DEEN_MEMORY_LAYOUT_AUDIT.md`. The DTC workflow must validate the absolute reserved-memory node deletion syntax.
+The Deen common DTSI now moves QSEE to the mainline/donor Deen region at 0x84300000 (32 MiB), deletes the overlapping inherited 0x85b00000 (8 MiB) region and removes the initial continuous-splash reservation at 0x90001000. The complete address/size arithmetic and deferred vendor memory regions are recorded in `documentation/DEEN_MEMORY_LAYOUT_AUDIT.md`. CI run `43620086484` compiled both PVT DTBs with this memory override and the synthetic base fixture; `dt-doc-validate`, processed schema generation and targeted `dt-validate` all returned exit 0.
 
 ## Power-domain support backport
 
-The v6.1 MSM8953 DTSI references `MSM8953_VDDCX` and a `qcom,msm8953-rpmpd` provider. The ACK 5.15 baseline lacked those seven power-domain IDs and the matching rpmpd driver descriptor. The Deen branch now carries the narrowly scoped v6.1 backport in `include/dt-bindings/power/qcom-rpmpd.h` and `drivers/soc/qcom/rpmpd.c`, plus the `qcom,msm8953-rpmpd` compatible in `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`. The ACK smoke compiles `drivers/soc/qcom/rpmpd.o`; DTS validation will include this schema.
+The v6.1 MSM8953 DTSI references `MSM8953_VDDCX` and a `qcom,msm8953-rpmpd` provider. The ACK 5.15 baseline lacked those seven power-domain IDs and the matching rpmpd driver descriptor. The Deen branch now carries the narrowly scoped v6.1 backport in `include/dt-bindings/power/qcom-rpmpd.h` and `drivers/soc/qcom/rpmpd.c`, plus the `qcom,msm8953-rpmpd` compatible in `Documentation/devicetree/bindings/power/qcom,rpmpd.yaml`. The ACK base smoke compiled the upstream `rpmpd.o`; the Deen DTS smoke separately compiled the backported MSM8953 `rpmpd.o` from this branch, and targeted schema validation passed.
 
 ## Static phandle result
 
@@ -43,6 +43,7 @@ The common file currently:
 - Includes the v6.1 MSM8953 SoC and PM8953 PMIC descriptions.
 - Defines the VPH fixed supply.
 - Adds GPIO85 Volume Up and enables PM8953 resin as Volume Down.
+- Adds the 32 MiB QSEE no-map reservation at `0x84300000`, replacing the conflicting inherited QSEE reservation and deleting the initial continuous-splash reservation.
 - Adds the PM8953 SMD RPM regulator table adapted from the mainline Deen board DTS.
 - Enables only `sdhc_1` (non-removable primary eMMC) and maps VMMC/VQMMC to PM8953 L8/L5.
 
@@ -50,11 +51,10 @@ It intentionally does not enable SDHC2, USB, remote processors, NFC, display, to
 
 ## Open blockers
 
-1. CI/Kbuild compilation of the synthetic base fixture and both PVT DTBs is pending.
-2. `dt-doc-validate` and targeted `dt-validate` using the processed Qualcomm ARM/RPM schemas are pending.
-3. Device-side stock DTB/bootloader evidence is required to identify PVT1 vs PVT2.
-4. Deen QSEE memory override is now drafted at 0x84300000/32 MiB; the inherited 0x85b00000 QSEE reservation and 0x90001000 continuous-splash reservation are deleted. The new DTC smoke must validate these overrides and ensure no overlap. Ramoops/TZ log/watchdog memory remains deferred until the exact DRAM map and 5.15 driver bindings are checked.
-5. UART console route must be confirmed before enabling.
-6. The eMMC and PMIC electrical configuration has not been tested on hardware.
+1. A full linked `Image` with the Deen platform config has not yet been built; the next CI gate is a generic GKI `Image` link with MSM8953 options and both DTBs.
+2. Device-side stock DTB/bootloader evidence is required to identify PVT1 vs PVT2. Do not infer the revision from XT1941-3 alone.
+3. The donor's ramoops/TZ log/watchdog memory remains deferred until the exact DRAM map and matching 5.15 drivers/bindings are audited.
+4. UART console route must be confirmed before enabling.
+5. The eMMC and PMIC electrical configuration has not been tested on hardware; a successful DTB compile is not electrical validation.
 
 No DTB from this branch is approved for flashing. The CI result is a syntax/binding smoke only, not a full hardware/boot validation.
