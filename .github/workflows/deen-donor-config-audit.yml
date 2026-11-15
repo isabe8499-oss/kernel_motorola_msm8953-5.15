@@ -1,0 +1,145 @@
+name: Deen 5.15 donor config symbol inventory
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bootstrap/DEEN_DONOR_CONFIG_AUDIT"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deen-donor-config-inventory
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    name: Inventory 4.19 donor symbols against ACK 5.15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out project control branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Kconfig dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev python3
+
+      - name: Fetch pinned Deen bring-up source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-config-src"
+          git fetch --no-tags --depth=1 origin \
+            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup
+          git worktree add --detach "$SRC" refs/remotes/origin/deen/dts-bringup
+          test -s "$SRC/arch/arm64/configs/gki_defconfig"
+          test -s "$SRC/arch/arm64/configs/deen-msm8953-base.fragment"
+          echo "source_sha=$(git -C "$SRC" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "gki_blob_sha=$(git -C "$SRC" rev-parse HEAD:arch/arm64/configs/gki_defconfig)" >> "$GITHUB_OUTPUT"
+          echo "fragment_blob_sha=$(git -C "$SRC" rev-parse HEAD:arch/arm64/configs/deen-msm8953-base.fragment)" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch and verify immutable 4.19 donor defconfig
+        id: donor
+        shell: bash
+        run: |
+          set -euo pipefail
+          DONOR="$RUNNER_TEMP/deen-4.19-defconfig"
+          curl --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/isabe8499-oss/kernel_motorola_msm8953-22/4.19.325-WIP/arch/arm64/configs/vendor/deen_defconfig" \
+            --output "$DONOR"
+          DONOR_BLOB="$(git hash-object "$DONOR")"
+          EXPECTED="ecef3b19eb5cbe5fef0c343b8fee2d54071a3c37"
+          test "$DONOR_BLOB" = "$EXPECTED" || {
+            echo "::error::Donor config blob changed: expected $EXPECTED, got $DONOR_BLOB"
+            exit 1
+          }
+          echo "donor_blob_sha=$DONOR_BLOB" >> "$GITHUB_OUTPUT"
+          echo "donor_sha256=$(sha256sum "$DONOR" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Run read-only donor symbol inventory
+        id: inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-config-src"
+          OUT="$RUNNER_TEMP/deen-donor-config-audit"
+          mkdir -p "$OUT"
+          python3 .github/scripts/deen_donor_config_audit.py \
+            --source-root "$SRC" \
+            --donor-config "$RUNNER_TEMP/deen-4.19-defconfig" \
+            --gki-config "$SRC/arch/arm64/configs/gki_defconfig" \
+            --fragment "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" \
+            --output-dir "$OUT"
+          cp "$RUNNER_TEMP/deen-4.19-defconfig" "$OUT/donor-deen_defconfig"
+          cp "$SRC/arch/arm64/configs/gki_defconfig" "$OUT/gki_defconfig"
+          cp "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" "$OUT/deen-msm8953-base.fragment"
+          echo "donor_sha=$(sha256sum "$RUNNER_TEMP/deen-4.19-defconfig" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Re-resolve the 20-symbol Deen base fragment
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-config-src"
+          OUT="$RUNNER_TEMP/deen-config-out"
+          mkdir -p "$OUT"
+          make -C "$SRC" O="$OUT" ARCH=arm64 gki_defconfig
+
+          "$SRC/scripts/kconfig/merge_config.sh" -m -r -O "$OUT" \
+            "$OUT/.config" "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" \
+            2>&1 | tee "$RUNNER_TEMP/deen-base-merge.log"
+          make -C "$SRC" O="$OUT" ARCH=arm64 olddefconfig
+
+          REQUIRED="ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 MAILBOX RPMSG QCOM_SMD_RPM QCOM_RPMPD SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC REGULATOR_QCOM_SMD_RPM REGULATOR_QCOM_SPMI REGULATOR_FIXED_VOLTAGE MMC MMC_SDHCI MMC_SDHCI_PLTFM MMC_SDHCI_MSM KEYBOARD_GPIO"
+          for symbol in $REQUIRED; do
+            grep -qx "CONFIG_\${symbol}=y" "$OUT/.config" || {
+              echo "::error::Kconfig did not retain CONFIG_\${symbol}=y"
+              exit 1
+            }
+          done
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 savedefconfig
+          test -s "$OUT/defconfig"
+          cp "$OUT/.config" "$RUNNER_TEMP/deen-donor-config-audit/resolved.config"
+          cp "$OUT/defconfig" "$RUNNER_TEMP/deen-donor-config-audit/savedefconfig"
+          cp "$RUNNER_TEMP/deen-base-merge.log" "$RUNNER_TEMP/deen-donor-config-audit/base-merge.log"
+
+          {
+            echo "# Deen 5.15 donor configuration inventory"
+            echo
+            echo "- ACK source commit: \${{ steps.source.outputs.source_sha }}"
+            echo "- ACK GKI defconfig blob: \${{ steps.source.outputs.gki_blob_sha }}"
+            echo "- 4.19 donor defconfig blob: \${{ steps.donor.outputs.donor_blob_sha }}"
+            echo "- 4.19 donor defconfig SHA-256: \${{ steps.donor.outputs.donor_sha256 }}"
+            echo "- Minimal Deen fragment blob: \${{ steps.source.outputs.fragment_blob_sha }}"
+            echo "- Result: donor symbol inventory completed; fragment Kconfig resolution retained all 20 required symbols."
+            echo "- Important: inventory presence is not driver compatibility or permission to enable a symbol."
+            echo
+            echo "## Resolved configuration hashes"
+            sha256sum "$OUT/.config" "$OUT/defconfig" \
+              "$SRC/arch/arm64/configs/deen-msm8953-base.fragment"
+          } > "$RUNNER_TEMP/deen-donor-config-audit/DEEN_DONOR_CONFIG_AUDIT.md"
+
+          cat "$RUNNER_TEMP/deen-donor-config-audit/deen-config-audit.md" >> "$GITHUB_STEP_SUMMARY"
+          cat "$RUNNER_TEMP/deen-donor-config-audit/DEEN_DONOR_CONFIG_AUDIT.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload donor symbol inventory and resolved config evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-donor-config-inventory
+          path: |
+            \${{ runner.temp }}/deen-donor-config-audit/
+            \${{ runner.temp }}/deen-config-out/.config
+          if-no-files-found: warn
+          retention-days: 14
