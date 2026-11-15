@@ -17,7 +17,7 @@
 
 ## Gate 2 — Deen hardware identity and boot contract
 
-1. Identify whether the handset uses PVT1 (`0x4D 0xC100`) or PVT2 (`0x4D 0xC200`); do not select a DTB from model name alone.
+1. Identify whether the handset uses PVT1 (`0x4D 0xC100`) or PVT2 (`0x4D 0xC200`); do not select a DTB from model name alone. Only use read-only `fastboot getvar product`, `fastboot getvar board` and `fastboot getvar hwrev`; never request `fastboot getvar all`.
 2. Use documentation/BOOT_CONTRACT_AUDIT.md as a provisional reference, then capture the exact device's boot_a/boot_b, vendor_boot, dtbo, recovery and vbmeta partition inventory and unpack the current Android 12 boot image. Do not rely on old BoardConfig values alone.
 3. Preserve a known-good boot image and tested recovery method before any flash test.
 
@@ -47,3 +47,11 @@
 8. Rebuild Image/DTBs and archive exact configs/hashes after each subsystem; only then generate the full Deen defconfig. Integrate only after boot layout, PVT and a rollback image are confirmed. No flash until a known-good recovery path exists.
 
 No donor tree is to be modified. SUSFS, NoMount and all root/hiding features remain outside this clean baseline.
+
+
+## Current verified progress — 2026-11-15
+
+- ThinLTO+CFI feasibility build passed for full ARM64 `Image` and PVT1/PVT2 DTB candidates (run `43684266664`). This is not Full LTO, a Deen-specific defconfig, boot image or hardware validation.
+- Artifact ZIP `14150664185` was downloaded and inspected; Image and both DTB hashes match the CI report.
+- The schema-skew hypothesis is now partially confirmed by direct ACK 5.15 vs Linux v6.1 binding comparison. Several diagnostics remain genuine or unresolved; do not suppress them.
+- Next safe work: continue per-node DTS/driver/schema reconciliation and complete the physical PVT read-only identification. No boot image, flash or AOSPA integration is authorized yet.
