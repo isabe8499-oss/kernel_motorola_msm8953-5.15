@@ -62,3 +62,26 @@ Read-only image observations:
 ## Safety boundary
 
 PVT1/PVT2 DTS files remain experimental candidates. No DTB is approved for the handset based only on Android properties or a source-level grep. No flash, boot image publication, or AOSPA integration is authorized by this audit.
+
+## Addendum — stock boot_b and bootloader evidence (2026-11-15)
+
+The user supplied a read-only fastboot capture:
+- `fastboot getvar product` → `deen`
+- `fastboot getvar board` → `deen`
+- `fastboot getvar hwrev` → `PVT1`
+
+The user supplied `Deen_Boot_B_Audit.tar`. The archive contains the raw 64 MiB `boot_b-original.img`, the raw 16 MiB `dto_b-original.img`, a report, and SHA256SUMS. The locally recomputed SHA-256 values match the report:
+- boot_b: `6e8ec0eafec86e50b8895f81fc1c4809f0c1e0c674ea82a8640e7a3ace7a9765`
+- dto_b: `080acf35a507ac9849cfcba47dc2ad83e01b75663a516279c8b9d243b719643e`
+
+The dto_b image is entirely zero-filled (16,777,216 zero bytes). The boot_b image is an Android boot image with header version 1 and contains seven valid FDT blobs. One Deen MSM8953 FDT contains:
+- model: `deen`
+- compatible: `qcom,msm8953-deen`, `qcom,msm8953-moto`, `qcom,msm8953`
+- `qcom,msm-id = <0x125 0>`
+- `qcom,board-id = <0x4D 0xC100>`
+
+This independently confirms that the C100 tuple exists in the supplied stock boot_b image and agrees with the bootloader's PVT1 report. It does not establish which of the seven FDTs the bootloader selects at runtime.
+
+The stock C100 FDT is 253,704 bytes and has 1,471 nodes. The compiled experimental PVT1 candidate from the validation artifact is 23,818 bytes and has 248 nodes. Therefore, matching root identity metadata must not be confused with full DTB equivalence. The current candidate remains non-flashable and is not approved for boot testing.
+
+The experimental PVT1/PVT2 root `model` and `compatible` values were aligned to the observed stock Deen root values. The validation workflow was tightened so any non-empty `dt-validate` diagnostics produce a HOLD rather than a misleading PASS.
