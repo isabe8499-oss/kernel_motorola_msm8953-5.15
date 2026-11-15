@@ -10,3 +10,10 @@ Expected source:
 - PVT1 MSM ID 0x125/0 Board ID 0x4D/0xC100
 - PVT2 Board ID 0x4D/0xC200
 This gate compiles DTBs only. It does not run schema, build a kernel Image, or authorize boot/flash.
+
+Retry after restoring complete upstream MSM8953 SoC DTSI:
+- Source: torvalds/linux v6.1 arch/arm64/boot/dts/qcom/msm8953.dtsi
+- Restored exact upstream file, 28,216 bytes; Git blob SHA 6b992a6d56c16d5151785df04fa2053c67ee7fad.
+- Restores SoC nodes and labels required by PM8953/common Deen DTS: spmi_bus, reserved-memory, pm8953_resin, rpm_requests, sdhc_1.
+- Structural gate updated to assert canonical upstream cache representation (two L2 nodes with cache-level=2; no invented cache-unified property).
+- Re-run must compile DTBs and inspect binary FDT before this source state is accepted.
