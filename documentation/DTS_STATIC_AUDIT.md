@@ -51,7 +51,7 @@ It intentionally does not enable SDHC2, USB, remote processors, NFC, display, to
 
 ## Open blockers
 
-1. A full linked `Image` with the Deen platform config has not yet been built; the generic GKI `Image` link with MSM8953 options was interrupted by runner shutdown (exit 143) during LTO and is queued for retry.
+1. A generic GKI ARM64 `Image` and both PVT candidate DTBs were successfully built using ThinLTO+CFI in run 43684266664. This is not a Deen-specific production defconfig or Full LTO final validation.
 2. Device-side stock DTB/bootloader evidence is required to identify PVT1 vs PVT2. Do not infer the revision from XT1941-3 alone.
 3. The donor's ramoops/TZ log/watchdog memory remains deferred until the exact DRAM map and matching 5.15 drivers/bindings are audited.
 4. UART console route must be confirmed before enabling.
