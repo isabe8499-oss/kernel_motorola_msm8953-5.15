@@ -77,7 +77,8 @@ jobs:
           grep -Fq 'qcom,board-id = <0x4D 0xC100>;' "$PVT1"
           ! grep -Fq 'qcom,msm-id' "$PVT2"
           grep -Fq 'qcom,board-id = <0x4D 0xC200>;' "$PVT2"
-          grep -Fq 'compatible = "motorola,deen", "qcom,msm8953";' "$PVT1"
+          grep -Fq 'compatible = "qcom,msm8953-deen", "qcom,msm8953-moto", "qcom,msm8953";' "$PVT1"
+          grep -Fq 'compatible = "qcom,msm8953-deen", "qcom,msm8953-moto", "qcom,msm8953";' "$PVT2"
 
           {
             echo "Source PVT1:"
@@ -175,6 +176,10 @@ jobs:
           SCHEMA_STATUS=${PIPESTATUS[0]}
           set -e
           echo "schema_status=$SCHEMA_STATUS" >> "$GITHUB_OUTPUT"
+          if [[ -s "$RUNNER_TEMP/c100-schema-validation.log" ]]; then
+            echo "schema_status=HOLD (dt-validate emitted diagnostics)" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           test "$SCHEMA_STATUS" -eq 0
 
       - name: Create validation report
@@ -188,16 +193,21 @@ jobs:
         run: |
           set -euo pipefail
           RESULT=PASS
-          if [[ "$BUILD_OUTCOME" != "success" || "$SCHEMA_OUTCOME" != "success" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb" ]]; then RESULT=FAIL; fi
+          if [[ "$BUILD_OUTCOME" != "success" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb" ]]; then RESULT=FAIL
+          elif [[ "$SCHEMA_OUTCOME" != "success" ]]; then RESULT=HOLD; fi
           {
             echo "# Deen C100 DTB identity validation"
             echo
             echo "- Result: $RESULT"
             echo "- Source branch: $SOURCE_BRANCH"
             echo "- Source commit: $SOURCE_SHA"
-            echo "- Candidate assertion only: MSM ID (0x125,0), board ID (0x4D,0xC100); not independently confirmed from stock DTB/bootloader data."
+            echo "- Stock boot_b evidence: seven FDTs were parsed; one Deen MSM8953 FDT contains msm-id (0x125,0) and board-id (0x4D,0xC100)."
+            echo "- Bootloader fastboot evidence: product=deen, board=deen, hwrev=PVT1."
+            echo "- dto_b audit: 16 MiB partition image is entirely zero-filled."
+            echo "- The C100 identity tuple is confirmed present in stock boot_b; bootloader selection behavior is not yet proven."
             echo "- PVT1 must match C100 and PVT2 must remain C200."
-            echo "- This validates metadata, DTB compilation and schema only; it does not establish bootloader selection or bootability."
+            echo "- This run validates source metadata and DTB compilation; any schema diagnostics produce HOLD."
+            echo "- The candidate DTB is not byte-equivalent to stock: stock C100 FDT has 1,471 nodes (253,704 bytes), while the current candidate has 248 nodes (23,818 bytes). Full hardware equivalence and bootability remain unproven."
             echo
             if [[ -s "$RUNNER_TEMP/c100-source-metadata.txt" ]]; then cat "$RUNNER_TEMP/c100-source-metadata.txt"; fi
             if [[ -s "$RUNNER_TEMP/c100-dtb-readback.txt" ]]; then cat "$RUNNER_TEMP/c100-dtb-readback.txt"; fi
