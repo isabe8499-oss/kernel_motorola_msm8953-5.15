@@ -28,3 +28,5 @@ Schema coverage correction: validate both PVT1 and PVT2 DTBs separately; preserv
 L1 schema reconciliation: remove cache-level=<1> from the 16 split L1 cache child nodes, matching upstream torvalds/linux v6.1 MSM8953 DTSI; retain split I/D topology. Revalidate both PVT variants against the updated source branch commit 2d8ebec89ecc702a8e9baccf61df0236df3051fc.
 
 Schema rerun after stock C100 reconciliation: qcom root compatible and ARM arch-cache topology patch commits 856326c, 35b183c, 10f0142; CI source assertion aligned 01a0388.
+
+Root binding reconciliation: qcom.yaml now accepts stock Deen root compatible triple; branch commit 33659fab9533e1b6bdf4b04b49db501f17c1b4bc. Re-run pinned DT schema against this source branch.
