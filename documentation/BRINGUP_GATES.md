@@ -72,6 +72,67 @@ The clean 4.19 donor contains:
 
 The physical revision in the XT1941-3 handset is unknown. Do not choose a production DTB based on the model number alone. Use the read-only bootloader queries in documentation/HARDWARE_IDENTIFICATION_GATE.md to collect only product, board and hwrev. Do not send full fastboot getvar all, because it can include device identifiers.
 
+
+## Gate E — stock boot A/B, DTB inventory and hardware match: PARTIAL PASS
+
+Read-only handset evidence supplied on 2026-11-15:
+- Product: `deen`; board: `msm8953`; hardware SKU: `XT1941-3`; reported `ro.boot.hwrev=0xC100`.
+- Boot layout: A/B slots; `boot_a`/`boot_b` are 64 MiB; `dto_a`/`dto_b` are 16 MiB; `vbmeta_a`/`vbmeta_b` are 64 KiB. No `vendor_boot` partition was listed.
+- Boot image A and B both have magic `ANDROID!`, legacy header version 1 and 2048-byte page size. Their kernel and ramdisk are gzip streams; the ramdisk decompresses to CPIO newc. Seven v17 FDT blobs are concatenated after the compressed ARM64 kernel stream inside the boot image kernel segment.
+- Both DTO partition dumps are entirely zero-filled (16 MiB each); SHA-256 for both is `080acf35a507ac9849cfcba47dc2ad83e01b75663a516279c8b9d243b719643e`. This proves only the supplied slot dumps were zero-filled; do not infer the partition's semantic role from its `dto` name.
+- The seven DTBs in boot_a and boot_b are byte-identical. The decompressed ARM64 Image is byte-identical and the decompressed CPIO ramdisk is byte-identical. The full boot partition images are not byte-identical because the compressed stream sizes differ.
+
+Stock boot image SHA-256:
+- `boot_a`: `3d653bf0a8c65c0adefefa348959450ee655a11c0ab90429b69490032372f06d`
+- `boot_b`: `6e8ec0eafec86e50b8895f81fc1c4809f0c1e0c674ea82a8640e7a3ace7a9765`
+
+### Stock DTB board table recovered from both slots
+
+All seven entries identify model `deen`. Six carry MSM8953 IDs `qcom,msm-id=(0x125,0)`; one is an SDM450 alternative `(0x152,0)`. The stock C100 entry is DTB 05 and the C200 entry is DTB 02:
+
+| Stock DTB | SoC compatible | qcom,msm-id | qcom,board-id | SHA-256 |
+|---|---|---|---|---|
+| 01 | MSM8953 Deen | (0x125,0) | (0x47,0xB1A0) | `db90582485060fc737e6ef965c59fe9ac48091e5e1180fbc7b116e94b970cfb3` |
+| 02 | MSM8953 Deen | (0x125,0) | (0x4D,0xC200) | `f1bd9bb41f203ebb443b79bfd38564e6203fb858be3d53d8ad132792952c9a16` |
+| 03 | MSM8953 Deen | (0x125,0) | (0x47,0xB200) | `807c5eb493215d2a33c45dca492065d1b8d0f6301cb7cc49c85fb423e2d909b2` |
+| 04 | SDM450 Deen | (0x152,0) | (0x48,0xA100) | `12255d74580f6ec3f704abb4293f73453a769a06cd5a333480750a7d08e0fbcb` |
+| 05 | MSM8953 Deen | (0x125,0) | (0x4D,0xC100) | `537dc8c3f0a75fbe0b27d8d32b067c7efa8472dccd86b33698700e7e4022408a` |
+| 06 | MSM8953 Deen | (0x125,0) | (0x47,0xA200) | `7b33da8cc1a02a91992417d0a26a61eb6c1df605198fb10ee7ff52055a1624be` |
+| 07 | MSM8953 Deen | (0x125,0) | (0x47,0xB1B0) | `91e132e5fb705ac372199e61962c645c2b7da26f55d07cedb89d831fa8f030d4` |
+
+The device-reported `ro.boot.hwrev=0xC100` is a direct board-ID match to stock DTB 05 (`qcom,board-id=(0x4D,0xC100)`). This makes the C100 DTB the strongest candidate for this handset. It does not independently prove the bootloader's selection algorithm or the bootloader's selected FDT in the captured boot session.
+
+### Comparison against the current ACK 5.15 candidate DTB
+
+The current PVT1 source wrapper contains:
+- `model = "Motorola One (Deen PVT1)"`
+- `compatible = "motorola,deen", "qcom,msm8953"`
+- `qcom,board-id = <0x4D 0xC100>`
+
+The stock C100 DTB contains:
+- `model = "deen"`
+- `compatible = "qcom,msm8953-deen", "qcom,msm8953-moto", "qcom,msm8953"`
+- `qcom,msm-id = <0x125 0>`
+- `qcom,board-id = <0x4D 0xC100>`
+
+Thus the board-ID pair matches, but the candidate's compatible list is not identical to stock and it omits the explicit `qcom,msm-id` property. Do not declare bootloader DTB selection compatibility from board ID alone. Review the platform's Qualcomm multi-DTB selection path and compare the C100 stock node set against the candidate before finalizing the wrapper.
+
+The current common Deen DTSI remains minimal: it enables only GPIO volume keys, PM8953 regulator definitions and primary SDHC1/eMMC. It does not yet reproduce the complete stock hardware tree or Android 14 peripheral support.
+
+### Gate E acceptance state
+
+- Stock boot A/B images copied and SHA-256 recorded: PASS.
+- Legacy boot header v1/page size 2048 identified: PASS.
+- Seven stock DTBs extracted from both slots and compared: PASS.
+- C100 stock board-ID match to handset-reported hwrev: PASS (strong matching evidence).
+- Bootloader selected-DTB mechanism independently confirmed: HOLD.
+- Current 5.15 PVT1 compatible/MSM ID parity with stock C100: HOLD.
+- DTO partition semantics beyond zero-filled dumps: HOLD.
+- Final Android 14 boot/recovery/AVB contract: HOLD.
+- No boot.img created and no partition flash performed.
+
+Full component extraction, hashes and comparison: the project audit generated locally from the supplied stock dump files on 2026-11-15; stock source binaries were not committed to the public repository.
+
 ## Gate F — minimal Deen Kconfig fragment: PASS / complete device defconfig: HOLD
 
 The minimal base fragment passed Kconfig resolution in run `43697546575`:
