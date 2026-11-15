@@ -28,3 +28,5 @@ Latest validation extension (2026-11-15):
 - dto_a/dto_b are separate 16 MiB partitions; do not assume DTBO format.
 - Target C100/PVT1 only for hardware-specific validation; PVT2 is comparison only.
 - L2_0 and L2_1 explicitly carry cache-unified; each of the eight CPU nodes must contain separate l1-icache and l1-dcache children in the compiled FDT.
+
+Stock C100 reconciliation test trigger: qcom root compatible and ARM arch-cache topology patch commits 856326c, 35b183c, 10f0142; CI fix 9188eda; workflow assertions aligned 01a0388.
