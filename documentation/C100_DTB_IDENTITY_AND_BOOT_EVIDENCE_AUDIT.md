@@ -129,3 +129,11 @@ python3 scripts/deen_dtb_audit.py boot_b-original.img msm8953-motorola-deen-pvt1
 The utility scans FDT blobs in a raw boot image, selects an exact MSM/board tuple, and reports node/property inventory. It explicitly does not claim semantic equivalence or bootability.
 
 Current gate remains **HOLD**. Next work is a subsystem-by-subsystem semantic comparison and source reconciliation against stock/known-good Deen DTS, not mass-copying the 4.19 vendor tree or suppressing schema diagnostics.
+
+
+The same binary inventory compared `compatible` strings across all nodes:
+- stock C100 FDT: 255 unique compatible strings.
+- candidate PVT1: 56 unique compatible strings.
+- 235 stock compatible strings do not appear verbatim in the candidate.
+
+The absent stock strings include vendor-specific entries for camera/ISP, display/MDSS, audio/QDSP, modem/MSS, GPU/ KGSL, IPA/networking, Wi-Fi/WCNSS, PMIC/charger/battery, sensors, and extensive debug/coresight infrastructure. Some vendor strings may map to different upstream compatibles or drivers, so this is not proof that every absent string needs to be copied literally. It is a subsystem inventory showing how much semantic reconciliation remains. Do not blindly add all 235 strings: map each stock function to the corresponding ACK 5.15 driver, binding, resources, and firmware contract first.
