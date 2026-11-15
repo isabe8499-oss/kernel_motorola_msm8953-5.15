@@ -14,6 +14,5 @@
 / {
 	model = "Motorola One (Deen PVT1)";
 	compatible = "motorola,deen", "qcom,msm8953";
-	qcom,msm-id = <0x125 0>;
 	qcom,board-id = <0x4D 0xC100>;
 };
