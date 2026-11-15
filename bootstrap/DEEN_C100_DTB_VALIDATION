@@ -30,3 +30,5 @@ L1 schema reconciliation: remove cache-level=<1> from the 16 split L1 cache chil
 Schema rerun after stock C100 reconciliation: qcom root compatible and ARM arch-cache topology patch commits 856326c, 35b183c, 10f0142; CI source assertion aligned 01a0388.
 
 Root binding reconciliation: qcom.yaml now accepts stock Deen root compatible triple; branch commit 33659fab9533e1b6bdf4b04b49db501f17c1b4bc. Re-run pinned DT schema against this source branch.
+
+Schema rerun after fixed SDCC pinctrl binding correction: branch commit 372a9ae6591f15b691f68cdbd2e6971f2d91c108. TSENS remains held pending type3 driver port.
