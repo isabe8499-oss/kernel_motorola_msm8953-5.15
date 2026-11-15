@@ -217,17 +217,17 @@ jobs:
             "$OUT/drivers/remoteproc/qcom_wcnss.o" \
             > "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt"
 
-          cat >> "$RUNNER_TEMP/deen-defconfig-audit/DEEN_DEFCONFIG_AUDIT.md" <<EOF
-
-          ## Object compile audit
-
-          - Result: PASS — 13 selected MSM8953 platform and remoteproc objects compiled.
-          - Full Image link, DTB schema acceptance, firmware load and device boot are not part of this gate.
-
-          ```text
-          $(cat "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt")
-          ```
-          EOF
+          {
+            echo
+            echo "## Object compile audit"
+            echo
+            echo "- Result: PASS — 13 selected MSM8953 platform and remoteproc objects compiled."
+            echo "- Full Image link, DTB schema acceptance, firmware load and device boot are not part of this gate."
+            echo
+            echo '~~~text'
+            cat "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt"
+            echo '~~~'
+          } >> "$RUNNER_TEMP/deen-defconfig-audit/DEEN_DEFCONFIG_AUDIT.md"
           cat "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload resolved config audit
