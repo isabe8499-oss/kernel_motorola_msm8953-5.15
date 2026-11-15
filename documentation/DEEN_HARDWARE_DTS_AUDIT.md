@@ -57,13 +57,13 @@ It does not yet enable display, touchscreen, camera, fingerprint, NFC, WLAN, Blu
 
 The ACK configuration smoke has compiled the MSM8953 GCC, pinctrl, SMD RPM and RPM power-domain objects, plus PMIC, regulator, SDHCI and GPIO-key objects. The backported `drivers/soc/qcom/rpmpd.o` in the Deen working tree also compiled successfully in the DTS smoke job.
 
-The three DTS candidates (a CI-only base fixture, PVT1 and PVT2) compiled with Clang 18 in CI run 43620086484. `dt-doc-validate`, processed-schema generation and targeted `dt-validate` all returned exit code 0; the Deen branch's backported MSM8953 `rpmpd.o` also compiled. The run uploaded artifact `deen-msm8953-base-dts-smoke` (artifact ID 14123732376).
+The three DTS candidates (a CI-only base fixture, PVT1 and PVT2) compiled with Clang 18 in CI run 43623081943; the Deen branch's backported MSM8953 `rpmpd.o` also compiled. The validator processes returned exit code 0, but the PVT logs contain 160 diagnostic lines; full-tree schema acceptance is HOLD (see `documentation/DTS_SCHEMA_DIAGNOSTIC_TRIAGE.md`).
 
-This is a successful syntax and binding-schema gate, not a kernel Image link, a physical board-ID match, an electrical test or a boot test.
+Subsequently, CI run 43684266664 successfully linked a generic GKI ARM64 Image using ThinLTO+CFI and rebuilt both PVT DTB candidates. The uploaded artifact was independently downloaded and its Image/DTB SHA-256 values were checked. This remains a syntax/build feasibility result, not clean schema acceptance, a physical board-ID match, an electrical test or a boot test.
 
 ## Next gated steps
 
-1. Complete the generic-GKI full Image link and both PVT DTB build currently running in CI.
+1. Generic GKI Image and both PVT candidate DTBs now build with ThinLTO+CFI (run 43684266664); keep Full LTO as a separate gate requiring a higher-memory runner.
 2. Verify the handset PVT/board ID using the read-only gate in `documentation/HARDWARE_IDENTIFICATION_GATE.md`.
 3. Compare the Deen donor's display, touchscreen, storage, regulator, thermal, NFC, Wi-Fi, camera, audio and fingerprint nodes against upstream 5.15 drivers and bindings one subsystem at a time.
 4. Port only nodes whose drivers and dependencies exist or have an independently reviewed backport.
