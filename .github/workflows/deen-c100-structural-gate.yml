@@ -55,10 +55,26 @@ jobs:
           OUT="$RUNNER_TEMP/deen-out"
           mkdir -p "$OUT"
           make -C "$SRC" O="$OUT" ARCH=arm64 defconfig
+          # Preserve the DTC/preprocessor command and preprocessed .dts when
+          # compilation fails, so unresolved-label issues can be diagnosed.
+          set +e
           make -C "$SRC" O="$OUT" ARCH=arm64 \
-            CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            CROSS_COMPILE=aarch64-linux-gnu- V=1 -j1 \
             qcom/msm8953-motorola-deen-pvt1.dtb \
-            qcom/msm8953-motorola-deen-pvt2.dtb
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/c100-structural-build.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          mkdir -p "$RUNNER_TEMP/c100-debug"
+          find "$OUT/arch/arm64/boot/dts/qcom" -maxdepth 1 \
+            \( -name 'msm8953-motorola-deen-pvt*.dts' -o -name 'msm8953-motorola-deen-pvt*.dtb' -o -name '*.cmd' \) \
+            -exec cp -t "$RUNNER_TEMP/c100-debug" {} + 2>/dev/null || true
+          find "$SRC/arch/arm64/boot/dts/qcom" -maxdepth 1 \
+            -name 'msm8953-motorola-deen-pvt*.dts' -exec cp -t "$RUNNER_TEMP/c100-debug" {} +
+          if [[ "$status" -ne 0 ]]; then
+            echo "DTC build failed; debug files preserved for diagnosis."
+            exit "$status"
+          fi
 
       - name: Verify compiled FDT node inventory and identity
         run: |
@@ -86,5 +102,7 @@ jobs:
           name: deen-c100-structural-dtb-evidence
           path: |
             ${{ runner.temp }}/deen-dtb-hashes.txt
+          ${{ runner.temp }}/c100-structural-build.log
+          ${{ runner.temp }}/c100-debug/**
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
