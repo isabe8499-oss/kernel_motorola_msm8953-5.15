@@ -6,7 +6,7 @@ on:
       source_branch:
         description: "Experimental source branch to validate"
         required: true
-        default: "deen/c100-dtb-match"
+        default: "deen/c100-dtb-validation"
         type: string
 
 permissions:
