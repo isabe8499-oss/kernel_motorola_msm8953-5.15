@@ -45,7 +45,7 @@ jobs:
           test "$(grep -c 'l1-icache' "$DTS")" -eq 8
           test "$(grep -c 'l1-dcache' "$DTS")" -eq 8
           test "$(grep -Ec 'L2_[01]: l2-cache_' "$DTS")" -eq 2
-          test "$(grep -c 'cache-unified;' "$DTS")" -eq 2
+          test "$(grep -c 'cache-level = <2>;' "$DTS")" -eq 2
           echo "source cpu/cache inventory PASS"
 
       - name: Compile PVT1 and PVT2 DTBs
@@ -75,8 +75,9 @@ jobs:
           test "$(fdtget -t x "$P1" / qcom,msm-id)" = "125 0"
           test "$(fdtget -t x "$P1" / qcom,board-id)" = "4d c100"
           test "$(fdtget -t x "$P2" / qcom,board-id)" = "4d c200"
+          test "$(fdtget -t x "$P1" /cpus/l2-cache_0 cache-level)" = "2"
+          test "$(fdtget -t x "$P1" /cpus/l2-cache_1 cache-level)" = "2"
           fdtget "$P1" /cpus/l2-cache_0 compatible
-          fdtget "$P1" /cpus/l2-cache_0 cache-unified
           sha256sum "$P1" "$P2" | tee "$RUNNER_TEMP/deen-dtb-hashes.txt"
 
       - name: Upload structural evidence
