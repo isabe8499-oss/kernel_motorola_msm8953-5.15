@@ -242,6 +242,11 @@ properties:
           - const: qcom,sm8350
 
       - items:
+          - const: qcom,msm8953-deen
+          - const: qcom,msm8953-moto
+          - const: qcom,msm8953
+
+      - items:
           - enum:
               - motorola,deen
           - const: qcom,msm8953
