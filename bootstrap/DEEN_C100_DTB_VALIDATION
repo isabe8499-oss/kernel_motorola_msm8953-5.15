@@ -17,4 +17,4 @@ C100 DTB-only smoke re-trigger: 2026-11-15T14:42:00-03:00
 Validation source branch: deen/c100-schema-reconcile-v2
 Root compatible follows ACK 5.15 qcom.yaml; PVT1 qcom,msm-id and board-id are stock boot_b-backed. Preserve all schema diagnostics; unresolved diagnostics remain HOLD.
 
-Retry after Kbuild configuration fix: 2026-11-15T14:xx:xx-03:00
+Retry after Kbuild configuration fix: commit cf7021193c58d13ad395fc2925b99a3d2feaed6d
