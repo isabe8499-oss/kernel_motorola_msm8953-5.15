@@ -4,3 +4,9 @@ Requested: 2026-11-15
 Re-run after audit-report correction: 2026-11-15
 Expanded gate (2026-11-15): validate resolved Kconfig dependencies for MSS, ADSP/PAS and WCNSS and compile 13 selected Qualcomm/Deen objects with Clang 18 in a serial job. This is a configuration/object audit only, not a full Image link or runtime/firmware validation.
 Retry after fixing malformed apt-get continuation (2026-11-15).
+
+Retry request (2026-11-15):
+- install Kconfig packages in one shell command without a trailing continuation token;
+- export the temporary LLVM 18 alias directory into the current step PATH before invoking ld.lld (GITHUB_PATH alone affects subsequent steps only);
+- create the artifact output directory before dependency/setup steps;
+- warn, rather than replace the root cause, if an earlier failure leaves no artifact files.
