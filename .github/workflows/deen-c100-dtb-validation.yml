@@ -78,7 +78,6 @@ jobs:
           grep -Fq 'qcom,msm-id = <0x125 0>;' "$PVT1"
           grep -Fq 'qcom,board-id = <0x4D 0xC100>;' "$PVT1"
           grep -Fq 'qcom,board-id = <0x4D 0xC200>;' "$PVT2"
-          grep -Fq 'qcom,board-id = <0x4D 0xC200>;' "$PVT2"
           grep -Fq 'compatible = "motorola,deen", "qcom,msm8953";' "$PVT1"
           grep -Fq 'compatible = "motorola,deen", "qcom,msm8953";' "$PVT2"
 
@@ -94,8 +93,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/deen-out"
-          # A DTB-only Kbuild invocation does not need a full kernel defconfig.
-          # Keep this smoke test scoped to preprocessing/compiling both candidates.
+          # Kbuild still requires a .config for DTB targets. Generate the generic
+          # arm64 baseline only; this is not the device kernel configuration.
+          make -C "$RUNNER_TEMP/deen-src" O="$RUNNER_TEMP/deen-out" ARCH=arm64 defconfig
 
       - name: Compile Deen PVT1 and PVT2 candidate DTBs
         id: build
