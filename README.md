@@ -4,7 +4,7 @@ Independent clean kernel bring-up for Motorola One Deen (XT1941 series, Qualcomm
 
 ## Project status
 
-**ACK source import, selected SoC object smoke and Deen DTS/schema smoke passed. A full generic-GKI Image link is now running in CI; no Deen-specific kernel or bootable image exists yet.**
+**ACK source import and selected Qualcomm object smoke passed. A generic GKI ARM64 Image plus both Deen PVT DTB candidates were successfully built in CI using ThinLTO + CFI (run 43684266664). Full LTO final validation, clean full-tree DTS schema validation, a Deen-specific device config, boot-image packaging and hardware validation remain open.**
 
 Existing Linux 3.18.140 and 4.19.325 repositories remain read-only donors.
 
@@ -36,4 +36,4 @@ The 4.19 donor has PVT1 and PVT2 DTS variants with board IDs `0x4D 0xC100` and `
 5. Require source SHA, build logs, resolved config, artifact hashes, DTB validation and rollback instructions for device tests.
 6. Never flash an unverified image; keep a known-good boot image and recovery route.
 
-No Deen-specific defconfig, full linked Image, DTBO/boot image, or runtime-validated vendor driver set exists yet. The PVT1/PVT2 DTBs pass syntax/schema compilation only; neither is approved for flashing.
+A generic GKI Image and PVT1/PVT2 candidate DTBs exist as verified CI artifacts, but this is not a Deen-specific production kernel. No final Deen defconfig, DTBO/boot image, or runtime-validated vendor driver set exists yet. The DTBs compile, but full-tree schema validation remains on HOLD due to 160 diagnostics; neither DTB is approved for flashing.
