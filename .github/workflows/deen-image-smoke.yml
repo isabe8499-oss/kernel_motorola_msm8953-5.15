@@ -86,7 +86,13 @@ jobs:
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 gki_defconfig
 
+          # Resource-feasibility profile only: measured Full LTO exceeded the practical
+          # memory limit of the standard 16 GiB runner. Preserve CFI; use ThinLTO here.
+          # Full LTO remains a separate final validation gate on a larger-memory runner.
           "$SRC/scripts/config" --file "$OUT/.config" \
+            --disable LTO_CLANG_FULL \
+            --enable LTO_CLANG_THIN \
+            --enable CFI_CLANG \
             --enable ARCH_QCOM \
             --enable COMMON_CLK_QCOM \
             --enable MSM_GCC_8953 \
@@ -115,12 +121,18 @@ jobs:
             OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
             HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
 
-          for SYMBOL in LTO_CLANG_FULL CFI_CLANG; do
-            grep -qx "CONFIG_${SYMBOL}=y" "$OUT/.config" || {
-              echo "::error::GKI Full LTO/CFI config did not retain CONFIG_${SYMBOL}=y"
-              exit 1
-            }
-          done
+          grep -qx 'CONFIG_LTO_CLANG_THIN=y' "$OUT/.config" || {
+            echo "::error::ThinLTO feasibility profile did not retain CONFIG_LTO_CLANG_THIN=y"
+            exit 1
+          }
+          grep -qx 'CONFIG_CFI_CLANG=y' "$OUT/.config" || {
+            echo "::error::Clang CFI was not retained in the feasibility profile"
+            exit 1
+          }
+          if grep -qx 'CONFIG_LTO_CLANG_FULL=y' "$OUT/.config"; then
+            echo "::error::Feasibility profile unexpectedly retained Full LTO"
+            exit 1
+          fi
 
           for SYMBOL in \
             ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 \
@@ -217,7 +229,7 @@ jobs:
           file "$RUNNER_TEMP/lld-smoke"
           sha256sum "$REAL_LINKER" "$LINKER_PATH" "$RUNNER_TEMP/lld-smoke"
 
-      - name: Build complete Image and both Deen DTB candidates
+      - name: Build ThinLTO feasibility Image and both Deen DTB candidates
         id: build
         shell: bash
         run: |
@@ -320,7 +332,7 @@ jobs:
             echo "- Base config: generic GKI defconfig plus MSM8953 platform/PMIC/eMMC options"
             echo "- Resolved config SHA-256: ${{ steps.configure.outputs.config_sha }}"
             echo "- Compiler: ${{ steps.configure.outputs.clang_version }}"
-            echo "- LTO/CFI: GKI Full LTO and Clang CFI retained"
+            echo "- LTO/CFI: ThinLTO feasibility profile with Clang CFI; Full LTO remains a separate final gate"
             echo "- CI memory mitigation: bounded swap based on free disk, serial build (-j1), LLD link threads=1, persistent RAM/swap/PSI/cgroup telemetry"
             echo "- Build target: full arm64 Image plus PVT1 and PVT2 DTBs"
             echo "- PVT1 board ID: 0x4D 0xC100"
