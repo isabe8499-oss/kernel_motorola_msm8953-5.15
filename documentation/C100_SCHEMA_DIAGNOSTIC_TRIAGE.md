@@ -42,3 +42,8 @@ The schema output is not sufficient to infer cache topology or TSENS IP compatib
 ## Safety status
 
 **HOLD.** No cache topology, TSENS compatible, memory map, firmware reservation, or boot packaging changes are approved solely to suppress diagnostics. No boot image generation or flashing is authorized by this triage.
+
+
+## Follow-up correction — current target scope
+
+The cache-level metadata correction is committed on the experimental source branch. The identity smoke workflow continues to compile and read back both PVT1 and PVT2 as controls, but schema diagnostics now target PVT1 only because PVT1 is the user's reported hardware revision. PVT2 remains a comparison control, not a candidate for this handset.
