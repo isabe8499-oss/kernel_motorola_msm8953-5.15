@@ -146,3 +146,12 @@
 		reg = <0x0 0x0 0x0 0x0>;
 	};
 };
+
+
+/*
+ * C100/Deen audit gate (2026-11-15):
+ * The cache topology above is intentionally split at L1 (I-cache/D-cache)
+ * and unified at L2. The generic cache schema currently rejects parts of
+ * this representation. Do not add cache-unified to L1 I/D nodes merely to
+ * suppress that diagnostic. Resolve against the exact ARM cache binding.
+ */
