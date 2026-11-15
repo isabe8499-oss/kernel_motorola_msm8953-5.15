@@ -21,3 +21,10 @@ Retry after restoring complete upstream MSM8953 SoC DTSI:
 Re-run after adding verbose DTC/preprocessor evidence capture. Workflow commit: 99a3a7e6f456df852a65a325ac9b62eb235ae5c3. Preserve failure logs and command files; no placeholder labels. 2026-11-15.
 
 Artifact-path correction commit: 3142f1737670291ea56b953972d02d6efca3f79c. New attempt should retain verbose DTC logs and .cmd files.
+
+Latest validation extension (2026-11-15):
+- Device readback confirms XT1941-3, ro.boot.hwrev=0xC100, active slot _a.
+- boot_a is 64 MiB, ANDROID! magic, boot image header v1.
+- dto_a/dto_b are separate 16 MiB partitions; do not assume DTBO format.
+- Target C100/PVT1 only for hardware-specific validation; PVT2 is comparison only.
+- L2_0 and L2_1 explicitly carry cache-unified; each of the eight CPU nodes must contain separate l1-icache and l1-dcache children in the compiled FDT.
