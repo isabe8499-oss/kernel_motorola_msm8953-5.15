@@ -111,6 +111,23 @@ def compatible_inventory(nodes_by_path):
     return [{"compatible": key, "node_count": counts[key]} for key in sorted(counts)]
 
 
+def reserved_memory_inventory(nodes_by_path):
+    result = []
+    for path, node in sorted(nodes_by_path.items()):
+        if not path.startswith("/reserved-memory/"):
+            continue
+        raw = node["props"].get("reg")
+        if raw is None:
+            continue
+        result.append({
+            "path": path,
+            "reg_cells": cells(raw),
+            "no_map": "no-map" in node["props"],
+            "compatible": compatibles(node),
+        })
+    return result
+
+
 def scan(data):
     found, start = [], 0
     while True:
@@ -162,6 +179,10 @@ def main():
                      "stock_compatible": compatibles(stock["root"]),
                      "candidate_compatible": compatibles(candidate["root"])},
         "candidate": {"size_bytes": candidate["size"], "node_count": len(candidate["nodes"])},
+        "reserved_memory_inventory": {
+            "stock": reserved_memory_inventory(s),
+            "candidate": reserved_memory_inventory(c),
+        },
         "compatible_inventory": {
             "stock": compatible_inventory(s),
             "candidate": compatible_inventory(c),
