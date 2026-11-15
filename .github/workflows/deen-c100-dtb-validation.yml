@@ -156,6 +156,7 @@ jobs:
           } | tee "$RUNNER_TEMP/c100-dtb-readback.txt"
 
       - name: Validate Qualcomm binding documents and compiled DTBs
+        id: schema
         shell: bash
         run: |
           set -euo pipefail
@@ -165,8 +166,13 @@ jobs:
           PVT2="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
           "$BIN/dt-doc-validate" "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml"
           "$BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" > "$RUNNER_TEMP/c100-schema.json"
+          set +e
           "$BIN/dt-validate" -s "$RUNNER_TEMP/c100-schema.json" "$PVT1" "$PVT2" \
             2>&1 | tee "$RUNNER_TEMP/c100-schema-validation.log"
+          SCHEMA_STATUS=${PIPESTATUS[0]}
+          set -e
+          echo "schema_status=$SCHEMA_STATUS" >> "$GITHUB_OUTPUT"
+          test "$SCHEMA_STATUS" -eq 0
 
       - name: Create validation report
         if: always()
@@ -212,6 +218,6 @@ jobs:
           retention-days: 14
 
       - name: Fail if C100 validation did not produce a usable candidate
-        if: steps.build.outcome != 'success'
+        if: steps.build.outcome != 'success' || steps.schema.outcome != 'success'
         shell: bash
         run: exit 1
