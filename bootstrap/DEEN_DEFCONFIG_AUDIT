@@ -1,3 +1,4 @@
 # Trigger the quick Deen defconfig audit.
 # This resolves the committed minimal fragment against pinned ACK 5.15 Kconfig.
 Requested: 2026-11-15
+Re-run after audit-report correction: 2026-11-15
