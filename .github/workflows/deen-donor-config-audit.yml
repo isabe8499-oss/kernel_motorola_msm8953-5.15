@@ -102,8 +102,8 @@ jobs:
 
           REQUIRED="ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 MAILBOX RPMSG QCOM_SMD_RPM QCOM_RPMPD SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC REGULATOR_QCOM_SMD_RPM REGULATOR_QCOM_SPMI REGULATOR_FIXED_VOLTAGE MMC MMC_SDHCI MMC_SDHCI_PLTFM MMC_SDHCI_MSM KEYBOARD_GPIO"
           for symbol in $REQUIRED; do
-            grep -qx "CONFIG_\${symbol}=y" "$OUT/.config" || {
-              echo "::error::Kconfig did not retain CONFIG_\${symbol}=y"
+            grep -qx "CONFIG_${symbol}=y" "$OUT/.config" || {
+              echo "::error::Kconfig did not retain CONFIG_${symbol}=y"
               exit 1
             }
           done
@@ -117,11 +117,11 @@ jobs:
           {
             echo "# Deen 5.15 donor configuration inventory"
             echo
-            echo "- ACK source commit: \${{ steps.source.outputs.source_sha }}"
-            echo "- ACK GKI defconfig blob: \${{ steps.source.outputs.gki_blob_sha }}"
-            echo "- 4.19 donor defconfig blob: \${{ steps.donor.outputs.donor_blob_sha }}"
-            echo "- 4.19 donor defconfig SHA-256: \${{ steps.donor.outputs.donor_sha256 }}"
-            echo "- Minimal Deen fragment blob: \${{ steps.source.outputs.fragment_blob_sha }}"
+            echo "- ACK source commit: ${{ steps.source.outputs.source_sha }}"
+            echo "- ACK GKI defconfig blob: ${{ steps.source.outputs.gki_blob_sha }}"
+            echo "- 4.19 donor defconfig blob: ${{ steps.donor.outputs.donor_blob_sha }}"
+            echo "- 4.19 donor defconfig SHA-256: ${{ steps.donor.outputs.donor_sha256 }}"
+            echo "- Minimal Deen fragment blob: ${{ steps.source.outputs.fragment_blob_sha }}"
             echo "- Result: donor symbol inventory completed; fragment Kconfig resolution retained all 20 required symbols."
             echo "- Important: inventory presence is not driver compatibility or permission to enable a symbol."
             echo
@@ -139,7 +139,7 @@ jobs:
         with:
           name: deen-donor-config-inventory
           path: |
-            \${{ runner.temp }}/deen-donor-config-audit/
-            \${{ runner.temp }}/deen-config-out/.config
+            ${{ runner.temp }}/deen-donor-config-audit/
+            ${{ runner.temp }}/deen-config-out/.config
           if-no-files-found: warn
           retention-days: 14
