@@ -200,7 +200,7 @@ jobs:
             echo "- dto_b audit: 16 MiB partition image is entirely zero-filled."
             echo "- The C100 identity tuple is confirmed present in stock boot_b; bootloader selection behavior is not yet proven."
             echo "- PVT1 must match C100 and PVT2 must remain C200."
-            echo "- Root compatible follows the ACK Qualcomm binding: motorola,deen + qcom,msm8953."
+            echo "- Root compatible matches the supplied stock C100 FDT: qcom,msm8953-deen + qcom,msm8953-moto + qcom,msm8953."
             echo "- Scope: minimal DTB identity/build smoke test only; this does not validate the full stock Deen device tree, memory/firmware/peripherals, bootloader DT selection, boot image packaging or bootability."
             echo "- Identity/build result: $RESULT"
             echo "- Schema classification (diagnostic, not identity/build gate): $SCHEMA_CLASSIFICATION"
