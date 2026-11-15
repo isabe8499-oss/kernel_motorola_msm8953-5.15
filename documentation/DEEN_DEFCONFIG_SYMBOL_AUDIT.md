@@ -15,9 +15,9 @@ The donor config is reference material only. It must not be copied wholesale int
 
 The raw assignment-key comparison found:
 
-- Donor 4.19 `deen_defconfig`: 642 `CONFIG_*=value` assignments.
+- Donor 4.19 `deen_defconfig`: 643 explicit `CONFIG_*=value` assignments plus 57 `# CONFIG_*=n` entries (700 unique keys total).
 - ACK 5.15 `gki_defconfig`: 656 assignments.
-- 313 assignment keys appear in the donor but not explicitly in the GKI baseline.
+- 314 explicit assignment keys appear in the donor but not in the explicit-assignment set of the GKI baseline.
 - 327 assignment keys appear in the GKI baseline but not explicitly in the donor.
 
 These counts are a set comparison of config keys. They do **not** prove that every donor-only symbol is missing from the 5.15 Kconfig tree, nor that every GKI-only option is required by Deen. Kconfig definition, dependencies, architecture/API compatibility and Android 14 userspace ABI must be evaluated separately.
@@ -37,6 +37,36 @@ The following MSM8953 dependencies were found in the pinned ACK 5.15 Kconfig fil
 The existing readiness audit separately establishes that the pinned ACK lacks the donor's downstream KGSL tree and Motorola camera/audio legacy techpacks. Their vendor config symbols must not be treated as supported merely because they appear in the 4.19 config.
 
 Legacy machine/platform symbols such as `ARCH_MSM8953`, `MACH_MOTOROLA_DEEN` and `MACH_MOTOROLA_MSM8953` are not copied into the new fragment. The 5.15 bring-up is based on the generic Qualcomm architecture plus the board's Device Tree compatible and explicit SoC drivers, not the donor's 4.19 machine Kconfig architecture.
+
+
+## Full donor symbol-definition inventory — PASS
+
+A second, read-only audit scanned the ACK 5.15 source tree rather than comparing only the names in two config files.
+
+- Workflow: [43699488864](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43699488864)
+- ACK source commit: `ff2a86b64b9357bbb79435b8fa88ea94c52c4111`
+- Kconfig files scanned: 1,615
+- Donor unique symbols: 700
+- Duplicate donor symbol assignments: 0
+- Symbols with no Kconfig definition found in ACK: 208
+- Symbols defined in ACK and explicitly represented in GKI baseline: 355
+- Symbols defined in ACK but neither explicit in GKI nor selected by the minimal fragment: 125
+- Donor symbols also selected in the minimal Deen fragment: 12
+- The 20-symbol minimal fragment contains 8 additional symbols not present in the 4.19 donor config; they are 5.15-specific base requirements.
+
+Artifact:
+- Name: `deen-donor-config-inventory`
+- ID: `14156096378`
+- ZIP SHA-256: `3d24cc02c49c03a3d7d42af11b4c501a4949fb4b20de42a177a767245a24bac2`
+- Donor config SHA-256: `9eb465f7aa489af4a49439b8f720e7c330448a2e104c031bd8f25f49e73869c8`
+- Resolved fragment .config SHA-256: `7fd7204305ffec3ea0e07acd93c081fb9e7ef81d52cf6a3c25516372e6e92a30`
+- Generated savedefconfig SHA-256: `870133b82ebc2a3adda0f53213e4b98050eb94af91437829aef54e5f2b92cd6a`
+
+High-impact donor symbols with no ACK Kconfig definition include `QCOM_KGSL`, `MSM_CAMERA`, `MSMB_CAMERA`, `NFC_NQ`, `PRONTO_WLAN`, `USB_DWC3_MSM`, `FUSB302`, `TOUCHSCREEN_NT36XXX` and `TOUCHSCREEN_FT5X06`. Their absence is consistent with missing vendor techpacks or different upstream subsystem names; it does not mean an unrelated upstream driver is ABI-equivalent.
+
+Conversely, ACK 5.15 has generic equivalents such as `TYPEC_FUSB302`, `USB_DWC3_QCOM` and `NFC_NXP_NCI_I2C`, but their compatible strings, wiring, firmware and userspace contracts must be checked against the actual Deen board. A Kconfig symbol's existence is not sufficient evidence to enable the subsystem.
+
+The detailed cross-subsystem decision matrix is in `documentation/DEEN_SUBSYSTEM_COMPATIBILITY_AUDIT.md`.
 
 ## Minimal Deen bring-up fragment
 
