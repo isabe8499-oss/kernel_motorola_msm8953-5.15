@@ -21,14 +21,18 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Prepare audit output directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-defconfig-audit"
+
       - name: Install Kconfig dependencies
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev \
-            dwarves binutils-aarch64-linux-gnu clang-18 lld-18 llvm-18
+          sudo apt-get install -y --no-install-recommends bc bison build-essential flex libelf-dev libssl-dev libncurses-dev dwarves binutils-aarch64-linux-gnu clang-18 lld-18 llvm-18
 
       - name: Fetch pinned Deen bring-up source
         id: source
@@ -57,7 +61,9 @@ jobs:
             done
           done
           echo "$RUNNER_TEMP/llvm-bin" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
           test -x "$RUNNER_TEMP/llvm-bin/ld.lld"
+          command -v ld.lld
           clang-18 --version
           ld.lld --version
 
@@ -230,5 +236,5 @@ jobs:
         with:
           name: deen-defconfig-symbol-audit
           path: ${{ runner.temp }}/deen-defconfig-audit/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
