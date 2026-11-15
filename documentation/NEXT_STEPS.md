@@ -37,9 +37,11 @@
 
 ## Gate 5 — Peripheral ports and device tests
 
-1. Validate the isolated `deen/msm8953-remoteproc-backports` branch: compile MSS, ADSP PAS and Pronto-v3 objects and validate the ADSP binding before considering DTS activation. Current CI: run 43702461753.
-2. Verify Android 12 vendor firmware files, memory regions, clocks, resets, power domains and SMEM/SMP2P routes for MPSS/ADSP/WCNSS. No remoteproc node is enabled yet.
-3. Port MSM8953 QUSB2 PHY data and reconcile DWC3 schema/driver handling in a separate branch.
+1. Remoteproc object audit has passed in run 43702964898: MSS, ADSP PAS and Pronto-v3 AArch64 objects compile, and the ADSP YAML document validates. Keep branch `deen/msm8953-remoteproc-backports` isolated.
+2. Complete donor-to-5.15 resource mapping before DTS activation: the donor uses `qcom,pil-q6v55-mss` for modem and `qcom,pil-tz-generic` for ADSP/Pronto; Deen `misc.dtsi` disables all three related SMP2P endpoints. See `documentation/DEEN_REMOTEPROC_INTEGRATION_AUDIT.md`.
+3. Inspect the stock Android 12 vendor firmware and verify MBA/MPSS, ADSP and WCNSS images, hashes and lookup paths; map the donor memory pools against QSEE/SMEM and current DRAM/reserved-memory map; verify clocks, resets, power domains and SMEM/SMP2P routing.
+4. Only after resource/firmware review, create separate MSS and ADSP DTS candidates and validate each independently. Keep the WCNSS WLAN stack separate from Pronto remoteproc.
+5. Port MSM8953 QUSB2 PHY data and reconcile DWC3 schema/driver handling in a separate branch.
 4. Resolve the NFC hardware conflict: donor 4.19 is NQ-NCI, while mainline reference is PN553.
 5. Port display/touch, GPU/KGSL, camera/audio, battery and thermal as isolated workstreams using the compatibility matrix.
 6. Build Image/DTBs and archive exact configs/hashes after each subsystem; only then generate the full Deen defconfig.
