@@ -80,10 +80,18 @@ The minimal base fragment passed Kconfig resolution in run `43697546575`:
 - `savedefconfig` and the fully resolved `.config` were generated and archived as artifact `14155361150`.
 - Detailed symbol inventory and hashes: `documentation/DEEN_DEFCONFIG_SYMBOL_AUDIT.md`.
 
-This is not a complete Deen device defconfig. The full config remains gated on board revision evidence, clean DTS schema validation and subsystem-by-subsystem driver/firmware/userspace ABI audit. Next:
-1. Map the remaining donor 4.19 config symbols one by one to an ACK 5.15 Kconfig symbol or an explicitly deferred vendor subsystem.
-2. Audit downstream KGSL/Adreno 506, camera-legacy/VFE/ISPIF, audio-legacy, WLAN, NFC, fingerprint, touch/display, sensors and power/thermal requirements before adding their symbols.
-3. Keep the current minimal fragment limited to the drivers used by the base DTS; do not mark it as the final `deen_defconfig`.
+This is not a complete Deen device defconfig. The full config remains gated on board revision evidence, clean DTS schema validation and subsystem-by-subsystem driver/firmware/userspace ABI audit.
+
+A subsequent read-only inventory passed in run [`43699488864`](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43699488864):
+- 700 unique symbols inventoried from the immutable 4.19 donor defconfig.
+- 208 have no Kconfig definition found in the ACK 5.15 tree.
+- 355 are explicitly represented in the GKI baseline; 125 are defined in ACK but not selected in the minimal Deen fragment; 12 are also selected in the 20-symbol fragment.
+- All 20 base fragment symbols were re-resolved successfully.
+- Detailed per-symbol CSV and decisions: `documentation/DEEN_DEFCONFIG_SYMBOL_AUDIT.md` and `documentation/DEEN_SUBSYSTEM_COMPATIBILITY_AUDIT.md`.
+
+The next semantic work is not another bulk config comparison: review exact driver/compatible/firmware/ABI support for each subsystem. An isolated branch `deen/msm8953-remoteproc-backports` currently adds MSM8953 MSS, ADSP PAS and Pronto-v3 resource/match support plus binding updates. Its targeted object-build CI is being corrected and re-run as [`43702461753`](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43702461753). Do not merge this branch or enable its DTS nodes until its object and binding gate passes, and firmware/memory/SMEM/clock dependencies have been checked.
+
+Keep the 20-symbol minimal fragment limited to the currently enabled base DTS; do not mark it as the final `deen_defconfig`.
 
 ## Gate G — boot image integration and device validation: BLOCKED
 
