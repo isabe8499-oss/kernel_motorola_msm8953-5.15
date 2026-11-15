@@ -1,0 +1,181 @@
+name: Deen MSM8953 remoteproc backport audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bootstrap/DEEN_REMOTEPROC_BACKPORT_AUDIT"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deen-msm8953-remoteproc-audit
+  cancel-in-progress: false
+
+jobs:
+  compile:
+    name: Build MSM8953 MSS, ADSP PAS and Pronto v3 objects
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out project control branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install targeted build and schema dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev \
+            python3 python3-venv python3-dev dwarves binutils-aarch64-linux-gnu \
+            clang-18 lld-18 llvm-18
+
+          python3 -m venv "$RUNNER_TEMP/dtschema-venv"
+          "$RUNNER_TEMP/dtschema-venv/bin/pip" install --upgrade pip "dtschema==2024.2"
+
+      - name: Fetch isolated remoteproc backport branch
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-rproc-src"
+          git fetch --no-tags --depth=1 origin \
+            +refs/heads/deen/msm8953-remoteproc-backports:refs/remotes/origin/deen/msm8953-remoteproc-backports
+          git worktree add --detach "$SRC" refs/remotes/origin/deen/msm8953-remoteproc-backports
+          test -s "$SRC/drivers/remoteproc/qcom_q6v5_mss.c"
+          test -s "$SRC/drivers/remoteproc/qcom_q6v5_pas.c"
+          test -s "$SRC/drivers/remoteproc/qcom_wcnss.c"
+          echo "source_sha=$(git -C "$SRC" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "base_sha=ff2a86b64b9357bbb79435b8fa88ea94c52c4111" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve a temporary Kconfig profile for the three remoteproc drivers
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-rproc-src"
+          OUT="$RUNNER_TEMP/deen-rproc-out"
+          mkdir -p "$OUT"
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 gki_defconfig
+          "$SRC/scripts/config" --file "$OUT/.config" \
+            --enable ARCH_QCOM \
+            --enable REMOTEPROC \
+            --enable RPMSG \
+            --enable RPMSG_QCOM_SMD \
+            --enable QCOM_SMEM \
+            --enable QCOM_SYSMON \
+            --enable QCOM_Q6V5_MSS \
+            --enable QCOM_Q6V5_PAS \
+            --enable QCOM_WCNSS_PIL
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 olddefconfig
+
+          REQUIRED="ARCH_QCOM REMOTEPROC RPMSG RPMSG_QCOM_SMD QCOM_SMEM QCOM_Q6V5_MSS QCOM_Q6V5_PAS QCOM_WCNSS_PIL QCOM_SCM QCOM_MDT_LOADER QCOM_Q6V5_COMMON QCOM_RPROC_COMMON QCOM_PIL_INFO"
+          for symbol in $REQUIRED; do
+            grep -qx "CONFIG_${symbol}=y" "$OUT/.config" || {
+              echo "::error::Kconfig did not retain CONFIG_${symbol}=y"
+              exit 1
+            }
+          done
+          cp "$OUT/.config" "$RUNNER_TEMP/DEEN_REMOTEPROC_CONFIG"
+          sha256sum "$OUT/.config" > "$RUNNER_TEMP/DEEN_REMOTEPROC_CONFIG.sha256"
+          echo "config_sha=$(sha256sum "$OUT/.config" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Check source diff and platform compatible coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-rproc-src"
+          BASE="${{ steps.source.outputs.base_sha }}"
+          git -C "$SRC" diff --check "$BASE" HEAD
+
+          grep -q '"qcom,msm8953-mss-pil"' "$SRC/drivers/remoteproc/qcom_q6v5_mss.c"
+          grep -q '"qcom,msm8953-adsp-pil"' "$SRC/drivers/remoteproc/qcom_q6v5_pas.c"
+          grep -q '"qcom,pronto-v3-pil"' "$SRC/drivers/remoteproc/qcom_wcnss.c"
+          grep -q 'qcom,msm8953-adsp-pil' "$SRC/Documentation/devicetree/bindings/remoteproc/qcom,adsp.yaml"
+          grep -q 'qcom,msm8953-mss-pil' "$SRC/Documentation/devicetree/bindings/remoteproc/qcom,q6v5.txt"
+          grep -q 'qcom,pronto-v3-pil' "$SRC/Documentation/devicetree/bindings/remoteproc/qcom,wcnss-pil.txt"
+
+          "$RUNNER_TEMP/dtschema-venv/bin/dt-doc-validate" \
+            "$SRC/Documentation/devicetree/bindings/remoteproc/qcom,adsp.yaml" \
+            2>&1 | tee "$RUNNER_TEMP/remoteproc-binding-check.log"
+
+      - name: Compile the three targeted remoteproc driver objects
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-rproc-src"
+          OUT="$RUNNER_TEMP/deen-rproc-out"
+          mkdir -p "$RUNNER_TEMP/llvm-bin"
+          LLVM_BIN="/usr/lib/llvm-18/bin"
+          for tool in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+            for candidate in "$LLVM_BIN/$tool" "/usr/bin/$tool-18" "/usr/bin/$tool"; do
+              if [[ -x "$candidate" ]]; then ln -sf "$candidate" "$RUNNER_TEMP/llvm-bin/$tool"; break; fi
+            done
+          done
+          export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
+
+          set +e
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 -j1 \
+            drivers/remoteproc/qcom_q6v5_mss.o \
+            drivers/remoteproc/qcom_q6v5_pas.o \
+            drivers/remoteproc/qcom_wcnss.o \
+            2>&1 | tee "$RUNNER_TEMP/deen-rproc-object-build.log"
+          BUILD_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          test -s "$OUT/drivers/remoteproc/qcom_q6v5_mss.o"
+          test -s "$OUT/drivers/remoteproc/qcom_q6v5_pas.o"
+          test -s "$OUT/drivers/remoteproc/qcom_wcnss.o"
+
+          {
+            echo "# MSM8953 remoteproc backport object audit"
+            echo
+            echo "- Result: PASS"
+            echo "- Source commit: ${{ steps.source.outputs.source_sha }}"
+            echo "- Resolved config SHA-256: ${{ steps.config.outputs.config_sha }}"
+            echo "- Compiled objects: qcom_q6v5_mss.o, qcom_q6v5_pas.o, qcom_wcnss.o"
+            echo "- Binding document validation: qcom,adsp.yaml passed dt-doc-validate"
+            echo "- Full kernel link, runtime firmware load and device boot are not part of this gate."
+            echo
+            sha256sum \
+              "$OUT/drivers/remoteproc/qcom_q6v5_mss.o" \
+              "$OUT/drivers/remoteproc/qcom_q6v5_pas.o" \
+              "$OUT/drivers/remoteproc/qcom_wcnss.o"
+          } > "$RUNNER_TEMP/DEEN_REMOTEPROC_AUDIT.md"
+          cat "$RUNNER_TEMP/DEEN_REMOTEPROC_AUDIT.md" >> "$GITHUB_STEP_SUMMARY"
+          echo "exit_code=$BUILD_STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Upload remoteproc object and binding evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-msm8953-remoteproc-backport-audit
+          path: |
+            ${{ runner.temp }}/DEEN_REMOTEPROC_AUDIT.md
+            ${{ runner.temp }}/DEEN_REMOTEPROC_CONFIG
+            ${{ runner.temp }}/DEEN_REMOTEPROC_CONFIG.sha256
+            ${{ runner.temp }}/remoteproc-binding-check.log
+            ${{ runner.temp }}/deen-rproc-object-build.log
+            ${{ runner.temp }}/deen-rproc-out/drivers/remoteproc/qcom_q6v5_mss.o
+            ${{ runner.temp }}/deen-rproc-out/drivers/remoteproc/qcom_q6v5_pas.o
+            ${{ runner.temp }}/deen-rproc-out/drivers/remoteproc/qcom_wcnss.o
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail workflow if any remoteproc object or binding gate failed
+        if: steps.build.outputs.exit_code != '0'
+        shell: bash
+        run: exit 1
