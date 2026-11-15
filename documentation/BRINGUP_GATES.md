@@ -42,7 +42,7 @@ Evidence and DTB hashes are in documentation/DEEN_DTS_BASE_SMOKE.md; source inve
 
 The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qualcomm ARM binding) were compared with the current deen/dts-bringup branch and are unchanged. Subsequent changes on that branch are documentation-only. A further binary read-back test using fdtget is running in CI run 43623081943; it checks the actual compiled qcom,board-id values, QSEE reg cells and absence of the two replaced memory nodes.
 
-## Gate D — full kernel Image link: RETRY IN PROGRESS / NOT APPROVED
+## Gate D — kernel Image build: ThinLTO feasibility / Full LTO HOLD
 
 First attempt: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (exit 143 during LTO `vmlinux.o`; no compiler diagnostic or artifact was produced).
 
@@ -56,7 +56,9 @@ CI-only mitigations preserve `CONFIG_LTO_CLANG_FULL=y` and `CONFIG_CFI_CLANG=y`,
 
 Captured failure evidence (operator screenshot, run `43640473415`): the final visible counters were `pswpin=452308`, `pswpout=1070203`, `pgmajfault=242730`, `oom_kill=0`; `/dev/root` showed 83 GiB free. The step ended with exit 143 after approximately 52m17s in the build step (run duration shown as 1h38m1s by GitHub). This is strong evidence of substantial paging/swap churn, not evidence of a cgroup OOM kill. It does not identify who sent SIGTERM or exclude host/runner-level memory pressure. The download-log endpoint remains `BlobNotFound` and no artifacts were uploaded because subsequent steps were skipped.
 
-A diagnostics-only workflow correction was committed after this capture: take an immediate console snapshot of free/swap/PSI/cgroup/vmstat, build elapsed time and make exit status directly after the make process, and avoid waiting for background monitor shutdown before logging. The next run should retain the exact final evidence in the Actions step output even if the runner dies before upload. The runner is a standard GitHub-hosted public-repository Linux VM with 4 vCPUs and 16 GB RAM according to GitHub's current runner specifications; this is not a repository-plan compute quota issue.
+The diagnostics retry `43657148581` (job `132638101488`) finally exposed the resource ceiling. The retrieved Actions log recorded `ld.lld` RSS growing from 7.6 GiB to 15.4 GiB; system memory reached 15 GiB used of 15 GiB, the 3 GiB swap reached 3 GiB used, PSI `full avg10` peaked at 15.53, swap-out rose above 1.1 million pages, and `oom_kill` remained zero. GitHub then explicitly logged `The runner has received a shutdown signal` followed by exit 143. This is evidence of Full-LTO link memory pressure exceeding the practical standard-runner envelope, not a source/compiler diagnostic and not proof of a kernel cgroup OOM kill.
+
+The standard 16 GiB runner is no longer treated as a valid execution target for this Full-LTO workload. The current CI workflow was changed to ThinLTO+CFI strictly as a **feasibility** build of Image and both Deen DTB candidates. That result cannot pass the Full-LTO gate. Full LTO remains required for final validation and must be run on a larger-memory runner or a separately provisioned host. No kernel-source or DTS changes are implied by this CI-profile adjustment.
 
 The build still uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image. Full success, hashes and artifact inspection are required before Gate D can pass.
 
