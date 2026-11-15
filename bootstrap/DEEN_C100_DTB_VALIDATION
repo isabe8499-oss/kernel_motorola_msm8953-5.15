@@ -6,3 +6,4 @@ Validation-only commit: e363945f62eed0a20c7b5fb5edb00c26370b25b0
 Expected root metadata: qcom,msm-id=<0x125 0>; qcom,board-id=<0x4D 0xC100>.
 Expected PVT2 control remains qcom,board-id=<0x4D 0xC200>.
 Only CI compile/readback/schema validation; never publish or flash an image.
+\nStock boot_b audit supplied 2026-11-15: PVT1 reported by fastboot; stock C100 FDT tuple confirmed (MSM 0x125/0, board 0x4D/C100); dto_b is zero-filled. Revalidate root compatible/model against stock and preserve schema diagnostics as HOLD.\n
