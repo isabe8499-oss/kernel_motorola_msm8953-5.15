@@ -1,6 +1,9 @@
 name: Deen C100 DTB identity validation
 
 on:
+  push:
+    paths:
+      - 'bootstrap/DEEN_C100_DTB_VALIDATION'
   workflow_dispatch:
     inputs:
       source_branch:
@@ -50,7 +53,7 @@ jobs:
         id: source
         shell: bash
         env:
-          SOURCE_BRANCH: ${{ inputs.source_branch }}
+          SOURCE_BRANCH: ${{ inputs.source_branch || 'deen/c100-dtb-validation' }}
         run: |
           set -euo pipefail
           SRC="$RUNNER_TEMP/deen-src"
@@ -177,17 +180,22 @@ jobs:
       - name: Create validation report
         if: always()
         shell: bash
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          SCHEMA_OUTCOME: ${{ steps.schema.outcome }}
+          SOURCE_BRANCH: ${{ steps.source.outputs.source_branch }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: |
           set -euo pipefail
           RESULT=PASS
-          if [[ ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb" ]]; then RESULT=FAIL; fi
+          if [[ "$BUILD_OUTCOME" != "success" || "$SCHEMA_OUTCOME" != "success" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb" ]]; then RESULT=FAIL; fi
           {
             echo "# Deen C100 DTB identity validation"
             echo
             echo "- Result: $RESULT"
-            echo "- Source branch: ${{ steps.source.outputs.source_branch }}"
-            echo "- Source commit: ${{ steps.source.outputs.source_sha }}"
-            echo "- Stock reference: MSM ID (0x125,0), board ID (0x4D,0xC100)"
+            echo "- Source branch: $SOURCE_BRANCH"
+            echo "- Source commit: $SOURCE_SHA"
+            echo "- Candidate assertion only: MSM ID (0x125,0), board ID (0x4D,0xC100); not independently confirmed from stock DTB/bootloader data."
             echo "- PVT1 must match C100 and PVT2 must remain C200."
             echo "- This validates metadata, DTB compilation and schema only; it does not establish bootloader selection or bootability."
             echo
