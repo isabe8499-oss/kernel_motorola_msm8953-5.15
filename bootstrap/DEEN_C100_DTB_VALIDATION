@@ -26,3 +26,5 @@ Schema follow-up: L1 cache-level metadata corrected on deen/c100-schema-reconcil
 Schema coverage correction: validate both PVT1 and PVT2 DTBs separately; preserve independent logs and review-required classification. Trigger after workflow update caa8ca57fc733870dadb0e1c1979926a6f7432ff.
 
 L1 schema reconciliation: remove cache-level=<1> from the 16 split L1 cache child nodes, matching upstream torvalds/linux v6.1 MSM8953 DTSI; retain split I/D topology. Revalidate both PVT variants against the updated source branch commit 2d8ebec89ecc702a8e9baccf61df0236df3051fc.
+
+Schema rerun after stock C100 reconciliation: qcom root compatible and ARM arch-cache topology patch commits 856326c, 35b183c, 10f0142; CI source assertion aligned 01a0388.
