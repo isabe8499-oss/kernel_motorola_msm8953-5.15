@@ -178,3 +178,20 @@ A targeted inventory of the selected stock C100 FDT versus the current minimal c
 This inventory is why the earlier successful MSS/ADSP/Pronto object compilation must not be interpreted as device-tree or firmware integration. Compiling driver objects proves only that selected source files build. It does not create the missing stock device nodes, IPC topology, memory references, firmware names, or runtime handshakes.
 
 The first full subsystem port should focus on **memory/SMEM + modem/MSS + ADSP + WCNSS/SMP2P**, because those components share reserved memory and IPC dependencies. Before enabling them, trace each stock `memory-region` phandle to its reservation, verify the ACK 5.15 driver binding and firmware filename, and map every SMD/SMSM/SMP2P channel. Keep the minimal candidate isolated until each dependency has an evidence-backed port.
+
+
+## Addendum — verified C100 smoke artifact run 43743256412 (2026-11-15)
+
+GitHub Actions run 43743256412 completed with conclusion `success` (job 132900852859). All job steps relevant to the smoke test passed: source checkout, metadata assertions, generic arm64 defconfig, PVT1/PVT2 DTB compilation, binary readback, report creation and artifact upload. Artifact ID: 14173266850 (`deen-c100-dtb-validation`, 580,955 bytes; not expired at audit time).
+
+The artifact ZIP was downloaded and inspected. It contains both non-empty DTBs, readback, build log, generated schema JSON, schema diagnostics and report. SHA-256 values independently recomputed from the extracted DTB files:
+- PVT1: `7ec387d579630fd213f68d134c76cd6721d960b2ec5ecde14b0d0453abc0fed7` (23,798 bytes).
+- PVT2: `e4965e060ab04a5b9e2a10670570fe9be7a8a5b15d8f62da48861f5409c0a19b` (23,766 bytes).
+
+Binary readback from `fdtget`:
+- PVT1 `qcom,msm-id = 125 0`, `qcom,board-id = 4d c100`.
+- PVT2 `qcom,board-id = 4d c200`.
+
+Schema result remains `REVIEW_REQUIRED`. The validator process returned exit status 0 but emitted repeated cache schema diagnostics (`cache-level`, `cache-unified`) and a thermal sensor compatible `oneOf` diagnostic. This is not a clean schema pass. The workflow intentionally treats schema as a separate diagnostic classification so identity/build smoke success does not conceal the warnings.
+
+**Gate status:** G1 identity PASS; G2 minimal DTB build PASS; G3 schema REVIEW_REQUIRED; G4 semantic full-device-tree port HOLD; G5 boot package HOLD. This run built only a minimal candidate with generic arm64 `defconfig`. It did not compile a full kernel Image, did not validate hardware semantics, did not verify bootloader DT selection, and does not authorize flashing.
