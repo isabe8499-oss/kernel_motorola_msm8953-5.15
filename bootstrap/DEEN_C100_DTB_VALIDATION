@@ -20,3 +20,5 @@ Root compatible follows ACK 5.15 qcom.yaml; PVT1 qcom,msm-id and board-id are st
 Retry after Kbuild configuration fix: commit cf7021193c58d13ad395fc2925b99a3d2feaed6d
 
 Retry after LLD executable correction: commit a1040377ffe3a64d062d4d45becb9eb9388229ba
+
+Schema follow-up: L1 cache-level metadata corrected on deen/c100-schema-reconcile-v2; PVT1-only schema diagnostics enabled in workflow. Re-trigger after workflow update 47b7296bab1136379a6b7d172f8f9777a04061d9.
