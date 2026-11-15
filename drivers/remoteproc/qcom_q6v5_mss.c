@@ -39,6 +39,7 @@
 #define MPSS_CRASH_REASON_SMEM		421
 
 #define MBA_LOG_SIZE			SZ_4K
+#define MPSS_PAS_ID			5
 
 /* RMB Status Register Values */
 #define RMB_PBL_SUCCESS			0x1
@@ -216,6 +217,7 @@ struct q6v5 {
 
 enum {
 	MSS_MSM8916,
+	MSS_MSM8953,
 	MSS_MSM8974,
 	MSS_MSM8996,
 	MSS_MSM8998,
@@ -661,13 +663,16 @@ static int q6v5proc_reset(struct q6v5 *qproc)
 			return ret;
 		}
 		goto pbl_wait;
-	} else if (qproc->version == MSS_MSM8996 ||
+	} else if (qproc->version == MSS_MSM8953 ||
+		   qproc->version == MSS_MSM8996 ||
 		   qproc->version == MSS_MSM8998) {
 		int mem_pwr_ctl;
 
-		/* Override the ACC value if required */
-		writel(QDSP6SS_ACC_OVERRIDE_VAL,
-		       qproc->reg_base + QDSP6SS_STRAP_ACC);
+		/* MSM8953 does not use the ACC override sequence. */
+		if (qproc->version != MSS_MSM8953) {
+			writel(QDSP6SS_ACC_OVERRIDE_VAL,
+			       qproc->reg_base + QDSP6SS_STRAP_ACC);
+		}
 
 		/* Assert resets, stop core */
 		val = readl(qproc->reg_base + QDSP6SS_RESET_REG);
@@ -709,7 +714,8 @@ static int q6v5proc_reset(struct q6v5 *qproc)
 		writel(val, qproc->reg_base + QDSP6SS_PWR_CTL_REG);
 
 		/* Turn on L1, L2, ETB and JU memories 1 at a time */
-		if (qproc->version == MSS_MSM8996) {
+		if (qproc->version == MSS_MSM8953 ||
+		    qproc->version == MSS_MSM8996) {
 			mem_pwr_ctl = QDSP6SS_MEM_PWR_CTL;
 			i = 19;
 		} else {
@@ -1204,6 +1210,16 @@ static int q6v5_mpss_load(struct q6v5 *qproc)
 
 		if (phdr->p_paddr + phdr->p_memsz > max_addr)
 			max_addr = ALIGN(phdr->p_paddr + phdr->p_memsz, SZ_4K);
+	}
+
+	/* MSM8953 requires TZ to be informed about the MPSS memory range. */
+	if (qproc->version == MSS_MSM8953) {
+		ret = qcom_scm_pas_mem_setup(MPSS_PAS_ID, qproc->mpss_phys,
+					     qproc->mpss_size);
+		if (ret) {
+			dev_err(qproc->dev, "setting up mpss memory failed: %d\n", ret);
+			goto release_firmware;
+		}
 	}
 
 	/*
@@ -2088,6 +2104,38 @@ static const struct rproc_hexagon_res msm8916_mss = {
 	.version = MSS_MSM8916,
 };
 
+static const struct rproc_hexagon_res msm8953_mss = {
+	.hexagon_mba_image = "mba.mbn",
+	.proxy_supply = (struct qcom_mss_reg_res[]) {
+		{
+			.supply = "pll",
+			.uA = 100000,
+		},
+		{}
+	},
+	.proxy_clk_names = (char*[]){
+		"xo",
+		NULL
+	},
+	.active_clk_names = (char*[]){
+		"iface",
+		"bus",
+		"mem",
+		NULL
+	},
+	.proxy_pd_names = (char*[]){
+		"cx",
+		"mx",
+		"mss",
+		NULL
+	},
+	.need_mem_protection = false,
+	.has_alt_reset = false,
+	.has_mba_logs = false,
+	.has_spare_reg = false,
+	.version = MSS_MSM8953,
+};
+
 static const struct rproc_hexagon_res msm8974_mss = {
 	.hexagon_mba_image = "mba.b00",
 	.proxy_supply = (struct qcom_mss_reg_res[]) {
@@ -2140,6 +2188,7 @@ static const struct rproc_hexagon_res msm8974_mss = {
 static const struct of_device_id q6v5_of_match[] = {
 	{ .compatible = "qcom,q6v5-pil", .data = &msm8916_mss},
 	{ .compatible = "qcom,msm8916-mss-pil", .data = &msm8916_mss},
+	{ .compatible = "qcom,msm8953-mss-pil", .data = &msm8953_mss},
 	{ .compatible = "qcom,msm8974-mss-pil", .data = &msm8974_mss},
 	{ .compatible = "qcom,msm8996-mss-pil", .data = &msm8996_mss},
 	{ .compatible = "qcom,msm8998-mss-pil", .data = &msm8998_mss},
