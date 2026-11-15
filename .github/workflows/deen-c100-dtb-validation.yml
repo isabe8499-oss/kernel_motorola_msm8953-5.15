@@ -145,7 +145,7 @@ jobs:
           "$BIN/dt-doc-validate" "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml"
           "$BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" > "$RUNNER_TEMP/c100-schema.json"
           set +e
-          "$BIN/dt-validate" -s "$RUNNER_TEMP/c100-schema.json" "$PVT1" "$PVT2" \
+          "$BIN/dt-validate" -s "$RUNNER_TEMP/c100-schema.json" "$PVT1" \
             2>&1 | tee "$RUNNER_TEMP/c100-schema-validation.log"
           SCHEMA_STATUS=${PIPESTATUS[0]}
           set -e
