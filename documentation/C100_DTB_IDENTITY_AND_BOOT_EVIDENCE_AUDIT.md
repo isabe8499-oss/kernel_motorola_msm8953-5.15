@@ -160,3 +160,21 @@ The candidate has exact-address/size entries for modem, ADSP, WCNSS and DFPS. It
 The root `/memory` node has a 16-byte zero-filled `reg` property in both the stock C100 FDT and candidate PVT1 DTB. Thus the schema's zero-sized memory diagnostic is also present in the stock source artifact and must be treated as a bootloader-populated/vendor convention pending validation of the boot path, not "fixed" by inventing RAM bounds.
 
 The audit utility now also emits reserved-memory inventories and compatible-string inventories. This is intended to make range/consumer mapping reproducible while retaining the warning that inventory is not semantic equivalence.
+
+
+## Addendum — subsystem presence comparison from stock C100 FDT
+
+A targeted inventory of the selected stock C100 FDT versus the current minimal candidate found the following high-priority gaps:
+
+| Subsystem | Stock C100 FDT evidence | Current candidate evidence | Disposition |
+|---|---|---|---|
+| Modem/MSS | `qcom,pil-q6v55-mss`, firmware name `modem`, modem memory-region reference | No corresponding MSS/PIL node | HOLD; port driver binding, memory-region and firmware contract |
+| ADSP | `qcom,adsp-loader`, ADSP SMD/SMSM endpoints, ADSP firmware and shared-memory reservations | No corresponding ADSP loader/SMD endpoint set | HOLD; reconstruct remoteproc/ADSP path |
+| WCNSS/Wi-Fi | `qcom,wcnss_wlan`, WCNSS SMD/SMSM and SMP2P endpoints, firmware reservation | No corresponding WCNSS device/endpoints | HOLD; Wi-Fi firmware and transport path absent |
+| Shared memory / IPC | Stock SMEM node plus modem/WCNSS/ADSP SMD/SMSM and SMP2P endpoints | Candidate has generic `/smd/rpm` and `/smsm/apps@0`, not the complete stock endpoint graph | HOLD; reconstruct channels and state links |
+| USB | Stock vendor DWC3/PHY/USB configuration | Candidate SoC USB node remains disabled in the minimal base | Not yet enabled; preserve until PHY, clocks, interrupts and role-switch contract are mapped |
+| Display/camera/audio | Numerous stock MDSS, camera/ISP, codec and QDSP nodes | Not represented in the minimal board layer | HOLD; subsystem ports remain future work |
+
+This inventory is why the earlier successful MSS/ADSP/Pronto object compilation must not be interpreted as device-tree or firmware integration. Compiling driver objects proves only that selected source files build. It does not create the missing stock device nodes, IPC topology, memory references, firmware names, or runtime handshakes.
+
+The first full subsystem port should focus on **memory/SMEM + modem/MSS + ADSP + WCNSS/SMP2P**, because those components share reserved memory and IPC dependencies. Before enabling them, trace each stock `memory-region` phandle to its reservation, verify the ACK 5.15 driver binding and firmware filename, and map every SMD/SMSM/SMP2P channel. Keep the minimal candidate isolated until each dependency has an evidence-backed port.
