@@ -4,7 +4,7 @@ Audit date: 2026-11-14
 
 ## 1. Source import gate
 
-Status: PARTIAL PASS — source integrity and selected compile gates pass; full Image link and clean PVT schema acceptance remain open.
+Status: PARTIAL PASS — source integrity and selected compile gates pass; generic GKI Image + PVT1/PVT2 DTB feasibility build passed with ThinLTO+CFI (run 43684266664). Full LTO, clean PVT schema acceptance, Deen-specific config and hardware boot remain open.
 
 - Official source: https://android.googlesource.com/kernel/common
 - Branch: android14-5.15-lts
@@ -91,7 +91,7 @@ CI run 43623081943 compiled the base fixture and both PVT candidate DTBs, verifi
 
 ## 7. Current decision
 
-The source import, ACK config/object smoke and minimal Deen DTS syntax/binary-property smoke are approved. Full-tree PVT schema validation is on HOLD due to 160 diagnostics. The generic-GKI full Image attempt was interrupted by runner shutdown and is being retried. The Deen-specific defconfig, complete peripheral stack, boot-image packaging and device boot are not approved.
+The source import, ACK config/object smoke and minimal Deen DTS syntax/binary-property smoke are approved. A generic GKI ARM64 Image and both PVT candidate DTBs were successfully built using ThinLTO+CFI in CI run 43684266664 and its artifact hashes were independently verified. This does not pass the Full LTO gate. Full-tree PVT schema validation remains on HOLD due to 160 diagnostics; the Deen-specific defconfig, complete peripheral stack, boot-image packaging and device boot are not approved.
 
 No device drivers have been copied into the upstream branch, no donor branch has been modified, and no flashable artifact is claimed.
 
@@ -115,7 +115,7 @@ The initial temporary DTSI fixture workflow has been superseded by the Deen boar
 - Schema process exit codes: 0, but 160 diagnostic lines remain; see `documentation/DTS_SCHEMA_DIAGNOSTIC_TRIAGE.md`
 - Backported MSM8953 rpmpd.o compiled.
 
-A separate full Image build is running:
-https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595
+Successful feasibility build:
+https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43684266664
 
-That workflow uses generic GKI defconfig plus MSM8953 options. It is not a Deen-specific defconfig, not a boot image and not a hardware test. Its result must be reviewed before the next gate is marked complete.
+The run used generic GKI + the currently selected MSM8953 boot dependencies, with ThinLTO+CFI. It produced Image and PVT1/PVT2 DTB candidates. It is not Full LTO, not a Deen-specific defconfig, not a boot image and not a hardware test. The dedicated Kconfig fragment resolution audit is now running via `.github/workflows/deen-defconfig-audit.yml`.
