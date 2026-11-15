@@ -64,6 +64,8 @@ jobs:
           echo "source_branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
           test -s "$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts"
           test -s "$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts"
+          test -s "$SRC/scripts/deen_dtb_audit.py"
+          python3 -m py_compile "$SRC/scripts/deen_dtb_audit.py"
 
       - name: Assert C100 source metadata before compiling
         shell: bash
@@ -193,8 +195,12 @@ jobs:
         run: |
           set -euo pipefail
           RESULT=PASS
-          if [[ "$BUILD_OUTCOME" != "success" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb" ]]; then RESULT=FAIL
+          PVT1_DTB="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          PVT2_DTB="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+          if [[ "$BUILD_OUTCOME" != "success" || ! -s "$PVT1_DTB" || ! -s "$PVT2_DTB" ]]; then RESULT=FAIL
           elif [[ "$SCHEMA_OUTCOME" != "success" ]]; then RESULT=HOLD; fi
+          PVT1_SIZE=unavailable
+          if [[ -s "$PVT1_DTB" ]]; then PVT1_SIZE="$(stat -c%s "$PVT1_DTB")"; fi
           {
             echo "# Deen C100 DTB identity validation"
             echo
@@ -207,7 +213,7 @@ jobs:
             echo "- The C100 identity tuple is confirmed present in stock boot_b; bootloader selection behavior is not yet proven."
             echo "- PVT1 must match C100 and PVT2 must remain C200."
             echo "- This run validates source metadata and DTB compilation; any schema diagnostics produce HOLD."
-            echo "- The candidate DTB is not byte-equivalent to stock: stock C100 FDT has 1,471 nodes (253,704 bytes), while the current candidate has 248 nodes (23,818 bytes). Full hardware equivalence and bootability remain unproven."
+            echo "- Structural inventory (separate local audit): stock C100 FDT has 1,471 nodes (253,704 bytes); candidate PVT1 had 248 nodes in the inspected artifact. Current run PVT1 DTB size: $PVT1_SIZE bytes. Full hardware equivalence and bootability remain unproven."
             echo
             if [[ -s "$RUNNER_TEMP/c100-source-metadata.txt" ]]; then cat "$RUNNER_TEMP/c100-source-metadata.txt"; fi
             if [[ -s "$RUNNER_TEMP/c100-dtb-readback.txt" ]]; then cat "$RUNNER_TEMP/c100-dtb-readback.txt"; fi
