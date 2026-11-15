@@ -129,7 +129,21 @@ patternProperties:
 
     required:
       - pins
-      - function
+
+    # SDC1/SDC2 are fixed-function SDCC pad groups represented by
+    # SDC_QDSD_PINGROUP in pinctrl-msm8953.c. They have no selectable
+    # mux function, unlike GPIO-capable TLMM groups.
+    allOf:
+      - if:
+          properties:
+            pins:
+              contains:
+                enum: [ sdc1_clk, sdc1_cmd, sdc1_data, sdc1_rclk,
+                        sdc2_clk, sdc2_cmd, sdc2_data ]
+        then: {}
+        else:
+          required:
+            - function
 
     additionalProperties: false
 
