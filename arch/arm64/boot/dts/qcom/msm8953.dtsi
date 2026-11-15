@@ -45,9 +45,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -62,9 +64,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -79,9 +83,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -96,9 +102,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -113,9 +121,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -130,9 +140,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -147,9 +159,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
@@ -164,9 +178,11 @@
 
 			l1-icache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 			l1-dcache {
 				compatible = "cache";
+				cache-level = <1>;
 			};
 		};
 
