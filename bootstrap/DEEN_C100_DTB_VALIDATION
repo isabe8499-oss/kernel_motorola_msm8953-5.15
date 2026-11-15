@@ -10,3 +10,5 @@ Only CI compile/readback/schema validation; never publish or flash an image.
 Structural audit utility added; CI now syntax-checks it and reports DTB size dynamically.
 
 Reserved-memory inventory added to the stock/candidate FDT audit utility.
+
+Added evidence-backed MSM8953 Deen root, TSENS and dedicated SDC binding support for revalidation.
