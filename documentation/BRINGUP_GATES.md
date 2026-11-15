@@ -42,7 +42,7 @@ Evidence and DTB hashes are in documentation/DEEN_DTS_BASE_SMOKE.md; source inve
 
 The tested DTS blobs (common board DTSI, both PVT wrappers, rpmpd driver and Qualcomm ARM binding) were compared with the current deen/dts-bringup branch and are unchanged. Subsequent changes on that branch are documentation-only. A further binary read-back test using fdtget is running in CI run 43623081943; it checks the actual compiled qcom,board-id values, QSEE reg cells and absence of the two replaced memory nodes.
 
-## Gate D — kernel Image build: ThinLTO feasibility / Full LTO HOLD
+## Gate D — ThinLTO feasibility Image: PASS / Full LTO HOLD
 
 First attempt: https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43621721595 (exit 143 during LTO `vmlinux.o`; no compiler diagnostic or artifact was produced).
 
@@ -59,6 +59,10 @@ Captured failure evidence (operator screenshot, run `43640473415`): the final vi
 The diagnostics retry `43657148581` (job `132638101488`) finally exposed the resource ceiling. The retrieved Actions log recorded `ld.lld` RSS growing from 7.6 GiB to 15.4 GiB; system memory reached 15 GiB used of 15 GiB, the 3 GiB swap reached 3 GiB used, PSI `full avg10` peaked at 15.53, swap-out rose above 1.1 million pages, and `oom_kill` remained zero. GitHub then explicitly logged `The runner has received a shutdown signal` followed by exit 143. This is evidence of Full-LTO link memory pressure exceeding the practical standard-runner envelope, not a source/compiler diagnostic and not proof of a kernel cgroup OOM kill.
 
 The standard 16 GiB runner is no longer treated as a valid execution target for this Full-LTO workload. The current CI workflow was changed to ThinLTO+CFI strictly as a **feasibility** build of Image and both Deen DTB candidates. That result cannot pass the Full-LTO gate. Full LTO remains required for final validation and must be run on a larger-memory runner or a separately provisioned host. No kernel-source or DTS changes are implied by this CI-profile adjustment.
+
+**Feasibility result passed (2026-11-15):** run [`43684266664`](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43684266664), commit `cf5856257cb115342d96374c92581efbe01358fc`, completed all build, artifact-upload and report-publication steps successfully. It produced ARM64 `Image` and both DTB candidates using ThinLTO+CFI. Source: `deen/dts-bringup` commit `8345f67abd78a0b6fc8e776c9279d9c88cdc5356`. Resolved config SHA-256: `83d34fb4ead2c65d37348b3eacef7b30b59324fcac59af3267f47311b52579c8`. Artifact ID: `14150664185`; ZIP SHA-256: `133a5a2760ad5a768b0a0129e475b1914edb081baa35ce183b9f0ffc896e6215`.
+
+Verified output SHA-256 values: Image `85584de409a2dbb019286532d53dcb3e6c07bf82ea46629035c28d9abe2191c8`; PVT1 DTB `41a0106d6ade5492497a6736a9c930c82f85fe3c909791968f3f7b0726fe5532`; PVT2 DTB `c06cc92f0487675277588594e03c1ad49eb5e69ff43ae7924bec2f50cb371055`. Artifact ZIP inspection confirmed an ARM64 kernel Image and two DTB v17 files (23,786 bytes each); headers are structurally consistent and both DTBs are included in the successful build. This is not DT schema acceptance, device-specific defconfig approval, hardware PVT selection, boot.img, or Full LTO validation.
 
 The build still uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image. Full success, hashes and artifact inspection are required before Gate D can pass.
 
