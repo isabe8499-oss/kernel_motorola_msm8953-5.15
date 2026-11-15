@@ -85,3 +85,22 @@ This independently confirms that the C100 tuple exists in the supplied stock boo
 The stock C100 FDT is 253,704 bytes and has 1,471 nodes. The compiled experimental PVT1 candidate from the validation artifact is 23,818 bytes and has 248 nodes. Therefore, matching root identity metadata must not be confused with full DTB equivalence. The current candidate remains non-flashable and is not approved for boot testing.
 
 The experimental PVT1/PVT2 root `model` and `compatible` values were aligned to the observed stock Deen root values. The validation workflow was tightened so any non-empty `dt-validate` diagnostics produce a HOLD rather than a misleading PASS.
+
+
+## Addendum — CI schema diagnostics (run 43735105437)
+
+The push-triggered validation run completed source assertions, minimal ACK configuration, and compilation of both PVT1/PVT2 DTBs successfully. The job failed only at the Devicetree schema validation step; the report and artifact upload completed. This is an intentional HOLD gate, not a compiler failure.
+
+Observed diagnostics include:
+- PVT1 SDC1/SDC2 pinctrl state nodes missing required `function` properties.
+- PVT1 GCC clock-controller `clocks`/`clock-names` schema mismatch.
+- PVT1 SPMI `reg` tuple length mismatch and PM8xxx RTC `reg`/`reg-names` mismatch.
+- PVT1 DWC3 compatible, clock-name and interrupt-count mismatches.
+- PVT1 APCS mailbox compatible-list mismatch.
+- PVT1 TSENS compatible is not accepted by the pinned current binding schema.
+- PVT2 root compatible list is not accepted by the current Qualcomm root schema; its memory node contains a zero-sized/zero-address `reg` tuple.
+- PVT2 cache nodes are missing required cache metadata; PVT2 TSENS also has a compatible mismatch.
+
+These findings must be investigated against the supplied stock C100 FDT and the exact ACK 5.15 binding revision. Do not silence diagnostics, delete hardware nodes, invent register ranges, or change clocks/interrupts merely to obtain a green workflow. First determine whether each issue is (a) a real DTS defect, (b) a donor-tree/5.15 schema-version mismatch, or (c) an inherited vendor binding exception. Record each disposition with evidence before changing the DTS.
+
+Current gate: **HOLD — DTBs compile, schema validation fails with diagnostics. No flashable DTB or boot image is approved.**
