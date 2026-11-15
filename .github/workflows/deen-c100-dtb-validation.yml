@@ -1,0 +1,217 @@
+name: Deen C100 DTB identity validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: "Experimental source branch to validate"
+        required: true
+        default: "deen/c100-dtb-match"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deen-c100-dtb-identity
+  cancel-in-progress: false
+
+jobs:
+  validate-c100:
+    name: Compile and validate Deen C100 DTB metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout control repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Install device-tree dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libelf-dev libncurses-dev libssl-dev \
+            python3 python3-dev python3-venv swig libfdt-dev device-tree-compiler \
+            dwarves binutils-aarch64-linux-gnu clang-18 lld-18 llvm-18
+
+      - name: Install pinned Devicetree schema validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/dtschema-venv"
+          "$RUNNER_TEMP/dtschema-venv/bin/pip" install --upgrade pip "dtschema==2024.2"
+          echo "$RUNNER_TEMP/dtschema-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch requested experimental source branch
+        id: source
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          git fetch --no-tags --depth=1 origin "+refs/heads/$SOURCE_BRANCH:refs/remotes/origin/c100-source"
+          git worktree add --detach "$SRC" refs/remotes/origin/c100-source
+          SHA="$(git -C "$SRC" rev-parse HEAD)"
+          echo "source_sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "source_branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+          test -s "$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts"
+          test -s "$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts"
+
+      - name: Assert C100 source metadata before compiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          PVT1="$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dts"
+          PVT2="$SRC/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dts"
+
+          grep -Fq 'qcom,msm-id = <0x125 0>;' "$PVT1"
+          grep -Fq 'qcom,board-id = <0x4D 0xC100>;' "$PVT1"
+          ! grep -Fq 'qcom,msm-id' "$PVT2"
+          grep -Fq 'qcom,board-id = <0x4D 0xC200>;' "$PVT2"
+          grep -Fq 'compatible = "motorola,deen", "qcom,msm8953";' "$PVT1"
+
+          {
+            echo "Source PVT1:"
+            grep -E 'compatible|qcom,msm-id|qcom,board-id' "$PVT1"
+            echo "Source PVT2:"
+            grep -E 'compatible|qcom,msm-id|qcom,board-id' "$PVT2"
+          } | tee "$RUNNER_TEMP/c100-source-metadata.txt"
+
+      - name: Configure minimal ACK 5.15 Deen base
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          OUT="$RUNNER_TEMP/deen-out"
+          mkdir -p "$OUT" "$RUNNER_TEMP/llvm-bin"
+          LLVM_BIN=/usr/lib/llvm-18/bin
+          for TOOL in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+            for CANDIDATE in "$LLVM_BIN/$TOOL" "/usr/bin/$TOOL-18" "/usr/bin/$TOOL"; do
+              if [[ -x "$CANDIDATE" ]]; then
+                ln -sf "$CANDIDATE" "$RUNNER_TEMP/llvm-bin/$TOOL"
+                break
+              fi
+            done
+          done
+          export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 CC=clang-18 LD=ld.lld \
+            HOSTLD=ld.lld AR=llvm-ar-18 NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 gki_defconfig
+          "$SRC/scripts/config" --file "$OUT/.config" \
+            --enable ARCH_QCOM --enable COMMON_CLK_QCOM --enable MSM_GCC_8953 \
+            --enable PINCTRL_MSM --enable PINCTRL_MSM8953 --enable MAILBOX \
+            --enable RPMSG --enable QCOM_SMD_RPM --enable QCOM_RPMPD \
+            --enable SPMI --enable SPMI_MSM_PMIC_ARB --enable MFD_SPMI_PMIC \
+            --enable REGULATOR_QCOM_SMD_RPM --enable REGULATOR_QCOM_SPMI \
+            --enable REGULATOR_FIXED_VOLTAGE --enable MMC --enable MMC_SDHCI \
+            --enable MMC_SDHCI_PLTFM --enable MMC_SDHCI_MSM --enable KEYBOARD_GPIO
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 CC=clang-18 LD=ld.lld \
+            HOSTLD=ld.lld AR=llvm-ar-18 NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 olddefconfig
+          cp "$OUT/.config" "$RUNNER_TEMP/c100-resolved.config"
+
+      - name: Compile Deen PVT1 and PVT2 candidate DTBs
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          OUT="$RUNNER_TEMP/deen-out"
+          export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 CC=clang-18 LD=ld.lld \
+            HOSTLD=ld.lld AR=llvm-ar-18 NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 -j1 \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/c100-dtb-build.log"
+
+          PVT1="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          PVT2="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+          test -s "$PVT1"
+          test -s "$PVT2"
+
+          PVT1_MSM="$(fdtget -t x "$PVT1" / qcom,msm-id)"
+          PVT1_BOARD="$(fdtget -t x "$PVT1" / qcom,board-id)"
+          PVT2_BOARD="$(fdtget -t x "$PVT2" / qcom,board-id)"
+          test "$(echo "$PVT1_MSM" | tr '[:upper:]' '[:lower:]')" = "125 0"
+          test "$(echo "$PVT1_BOARD" | tr '[:upper:]' '[:lower:]')" = "4d c100"
+          test "$(echo "$PVT2_BOARD" | tr '[:upper:]' '[:lower:]')" = "4d c200"
+
+          {
+            echo "PVT1 msm-id=$PVT1_MSM board-id=$PVT1_BOARD"
+            echo "PVT2 board-id=$PVT2_BOARD"
+            sha256sum "$PVT1" "$PVT2"
+          } | tee "$RUNNER_TEMP/c100-dtb-readback.txt"
+
+      - name: Validate Qualcomm binding documents and compiled DTBs
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          BIN="$RUNNER_TEMP/dtschema-venv/bin"
+          PVT1="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          PVT2="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+          "$BIN/dt-doc-validate" "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml"
+          "$BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" > "$RUNNER_TEMP/c100-schema.json"
+          "$BIN/dt-validate" -s "$RUNNER_TEMP/c100-schema.json" "$PVT1" "$PVT2" \
+            2>&1 | tee "$RUNNER_TEMP/c100-schema-validation.log"
+
+      - name: Create validation report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          RESULT=PASS
+          if [[ ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb" || ! -s "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb" ]]; then RESULT=FAIL; fi
+          {
+            echo "# Deen C100 DTB identity validation"
+            echo
+            echo "- Result: $RESULT"
+            echo "- Source branch: ${{ steps.source.outputs.source_branch }}"
+            echo "- Source commit: ${{ steps.source.outputs.source_sha }}"
+            echo "- Stock reference: MSM ID (0x125,0), board ID (0x4D,0xC100)"
+            echo "- PVT1 must match C100 and PVT2 must remain C200."
+            echo "- This validates metadata, DTB compilation and schema only; it does not establish bootloader selection or bootability."
+            echo
+            if [[ -s "$RUNNER_TEMP/c100-source-metadata.txt" ]]; then cat "$RUNNER_TEMP/c100-source-metadata.txt"; fi
+            if [[ -s "$RUNNER_TEMP/c100-dtb-readback.txt" ]]; then cat "$RUNNER_TEMP/c100-dtb-readback.txt"; fi
+            if [[ -s "$RUNNER_TEMP/c100-dtb-build.log" ]]; then tail -n 60 "$RUNNER_TEMP/c100-dtb-build.log"; fi
+            if [[ -s "$RUNNER_TEMP/c100-schema-validation.log" ]]; then tail -n 100 "$RUNNER_TEMP/c100-schema-validation.log"; fi
+          } > "$RUNNER_TEMP/C100_DTB_VALIDATION.md"
+
+          cat "$RUNNER_TEMP/C100_DTB_VALIDATION.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload C100 validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-dtb-validation
+          path: |
+            ${{ runner.temp }}/C100_DTB_VALIDATION.md
+            ${{ runner.temp }}/c100-source-metadata.txt
+            ${{ runner.temp }}/c100-dtb-readback.txt
+            ${{ runner.temp }}/c100-dtb-build.log
+            ${{ runner.temp }}/c100-schema-validation.log
+            ${{ runner.temp }}/c100-resolved.config
+            ${{ runner.temp }}/c100-schema.json
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail if C100 validation did not produce a usable candidate
+        if: steps.build.outcome != 'success'
+        shell: bash
+        run: exit 1
