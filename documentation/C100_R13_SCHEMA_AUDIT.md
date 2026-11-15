@@ -52,3 +52,18 @@ The driver has generic `qcom,tsens-v2` fallback matching data_tsens_v2, but this
 3. Review memory@86300000 and RPM-related nodes against matching qcom,smem.yaml/qcom,smd-rpm.yaml/rpmpd bindings; avoid transplanting PVT2-only warnings into PVT1 fixes.
 4. Split schema logs/report per variant and preserve every diagnostic.
 5. Keep boot image, full kernel, and flashing gates blocked.
+
+## Follow-up: restoration of MSM8953 CPU/cache source (2026-11-15)
+
+A temporary source-edit attempt used the contents API on `arch/arm64/boot/dts/qcom/msm8953.dtsi` and replaced the file body unintentionally. This was immediately detected by re-fetching the branch file and corrected by restoring the intended minimal eight-core source. Current file blob SHA: `3c4b5cc577a8e19c9970ac185a8ad4fca652eae4`.
+
+Re-fetch verification after restoration:
+- CPU nodes: 8 (CPU0 through CPU7).
+- Separate `l1-icache` child nodes: 8.
+- Separate `l1-dcache` child nodes: 8.
+- L2 cluster cache nodes: 2.
+- L1 nodes retain `cache-level = <1>`; L2 nodes retain `cache-level = <2>` and `cache-unified`.
+- Root memory node still has zero reg, which is bootloader-populated/minimal placeholder behavior and must not be treated as a complete memory map.
+- This source restoration has NOT yet been validated by a fresh compile. The last successful artifact predates the restoration and must not be cited as validating this source snapshot.
+
+Next step: run an isolated compile of PVT1/PVT2 from the restored branch and verify the CPU/cache nodes in the produced binary before further schema edits.
