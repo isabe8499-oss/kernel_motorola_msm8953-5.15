@@ -137,3 +137,26 @@ The same binary inventory compared `compatible` strings across all nodes:
 - 235 stock compatible strings do not appear verbatim in the candidate.
 
 The absent stock strings include vendor-specific entries for camera/ISP, display/MDSS, audio/QDSP, modem/MSS, GPU/ KGSL, IPA/networking, Wi-Fi/WCNSS, PMIC/charger/battery, sensors, and extensive debug/coresight infrastructure. Some vendor strings may map to different upstream compatibles or drivers, so this is not proof that every absent string needs to be copied literally. It is a subsystem inventory showing how much semantic reconciliation remains. Do not blindly add all 235 strings: map each stock function to the corresponding ACK 5.15 driver, binding, resources, and firmware contract first.
+
+
+## Addendum — reserved-memory and schema cross-check
+
+A direct read of the stock C100 FDT and the compiled PVT1 DTB shows that the broad 0x84300000–0x86800000 span is represented differently:
+- Stock: one `other_ext_region@0` reservation at 0x84300000, size 0x02500000 (37 MiB).
+- Candidate: `qseecom@84300000` at 0x84300000/0x02000000 (32 MiB), plus adjacent 0x86300000/0x00100000 and 0x86400000/0x00400000 regions. Their combined span is also 37 MiB, but labels, consumers and semantics are not yet proven equivalent.
+
+The following stock reservation ranges are visible in the selected C100 FDT:
+- modem: 0x86c00000/0x06a00000
+- ADSP firmware: 0x8d600000/0x01100000
+- WCNSS firmware: 0x8e700000/0x00700000
+- DFPS data: 0x90000000/0x00001000
+- splash: 0x90001000/0x013ff000
+- ramoops: 0xef000000/0x000c0000
+- TZ log backup: 0xaefd2000/0x00002000
+- watchdog CPU context: 0xaefd4000/0x0002c000
+
+The candidate has exact-address/size entries for modem, ADSP, WCNSS and DFPS. Its splash reservation is intentionally absent in the current minimal bring-up. It does not yet reproduce the stock ramoops, TZ-log or watchdog-context reservations; it also has additional reservations (including 0x91400000, 0x92000000 and 0xf2d00000) that require consumer/firmware reconciliation. Do not change these ranges until their consumers and firmware contracts are identified.
+
+The root `/memory` node has a 16-byte zero-filled `reg` property in both the stock C100 FDT and candidate PVT1 DTB. Thus the schema's zero-sized memory diagnostic is also present in the stock source artifact and must be treated as a bootloader-populated/vendor convention pending validation of the boot path, not "fixed" by inventing RAM bounds.
+
+The audit utility now also emits reserved-memory inventories and compatible-string inventories. This is intended to make range/consumer mapping reproducible while retaining the warning that inventory is not semantic equivalence.
