@@ -10,3 +10,5 @@ Retry request (2026-11-15):
 - export the temporary LLVM 18 alias directory into the current step PATH before invoking ld.lld (GITHUB_PATH alone affects subsequent steps only);
 - create the artifact output directory before dependency/setup steps;
 - warn, rather than replace the root cause, if an earlier failure leaves no artifact files.
+
+Report-generation correction request (2026-11-15): use a quoted-independent brace block with explicit echo/cat commands instead of a shell heredoc whose body contained unescaped command substitution/backticks. The previous job compiled 13 objects successfully, but attempted to execute the literal documentation token `text` and the hash as shell commands; the report was incomplete even though the job ended green. The corrected run must verify report and resolved config artifacts.
