@@ -144,11 +144,22 @@ jobs:
           PVT2="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
           "$BIN/dt-doc-validate" "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml"
           "$BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" > "$RUNNER_TEMP/c100-schema.json"
-          set +e
-          "$BIN/dt-validate" -s "$RUNNER_TEMP/c100-schema.json" "$PVT1" \
-            2>&1 | tee "$RUNNER_TEMP/c100-schema-validation.log"
-          SCHEMA_STATUS=${PIPESTATUS[0]}
-          set -e
+          SCHEMA_STATUS=0
+          : > "$RUNNER_TEMP/c100-schema-validation.log"
+          for VARIANT in PVT1 PVT2; do
+            if [[ "$VARIANT" == "PVT1" ]]; then DTB="$PVT1"; else DTB="$PVT2"; fi
+            VARIANT_LOG="$RUNNER_TEMP/c100-schema-${VARIANT}.log"
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/c100-schema.json" "$DTB" \
+              2>&1 | tee "$VARIANT_LOG"
+            VARIANT_STATUS=${PIPESTATUS[0]}
+            set -e
+            {
+              echo "===== $VARIANT schema validation (exit $VARIANT_STATUS) ====="
+              cat "$VARIANT_LOG"
+            } >> "$RUNNER_TEMP/c100-schema-validation.log"
+            if [[ "$VARIANT_STATUS" -ne 0 ]]; then SCHEMA_STATUS="$VARIANT_STATUS"; fi
+          done
           echo "schema_status=$SCHEMA_STATUS" >> "$GITHUB_OUTPUT"
           if [[ "$SCHEMA_STATUS" -ne 0 ]]; then
             echo "schema_classification=DIAGNOSTIC_HOLD" >> "$GITHUB_OUTPUT"
