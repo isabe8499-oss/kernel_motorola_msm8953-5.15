@@ -11,6 +11,7 @@ on the Qualcomm Hexagon core.
 		    "qcom,ipq8074-wcss-pil"
 		    "qcom,qcs404-wcss-pil"
 		    "qcom,msm8916-mss-pil",
+		    "qcom,msm8953-mss-pil",
 		    "qcom,msm8974-mss-pil"
 		    "qcom,msm8996-mss-pil"
 		    "qcom,msm8998-mss-pil"
@@ -42,6 +43,7 @@ on the Qualcomm Hexagon core.
 	qcom,ipq8074-wcss-pil:
 	qcom,qcs404-wcss-pil:
 	qcom,msm8916-mss-pil:
+	qcom,msm8953-mss-pil:
 	qcom,msm8974-mss-pil:
 		    must be "wdog", "fatal", "ready", "handover", "stop-ack"
 	qcom,msm8996-mss-pil:
@@ -76,6 +78,7 @@ on the Qualcomm Hexagon core.
 		    "lcc_axim_cbc", "lcc_bcr_sleep"
 	qcom,q6v5-pil:
 	qcom,msm8916-mss-pil:
+	qcom,msm8953-mss-pil:
 	qcom,msm8974-mss-pil:
 		    must be "iface", "bus", "mem", "xo"
 	qcom,msm8996-mss-pil:
@@ -149,6 +152,7 @@ For the compatible string below the following supplies are required:
 
 For the compatible string below the following supplies are required:
   "qcom,msm8996-mss-pil"
+  "qcom,msm8953-mss-pil"
 - pll-supply:
 	Usage: required
 	Value type: <phandle>
@@ -172,6 +176,8 @@ For the compatible string below the following supplies are required:
 	qcom,msm8996-mss-pil:
 	qcom,msm8998-mss-pil:
 		    must be "cx", "mx"
+	qcom,msm8953-mss-pil:
+		    must be "cx", "mx", "mss"
 	qcom,sc7180-mss-pil:
 	qcom,sdm845-mss-pil:
 		    must be "cx", "mx", "mss", "load_state"
