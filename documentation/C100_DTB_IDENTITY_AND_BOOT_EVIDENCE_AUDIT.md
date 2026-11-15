@@ -104,3 +104,28 @@ Observed diagnostics include:
 These findings must be investigated against the supplied stock C100 FDT and the exact ACK 5.15 binding revision. Do not silence diagnostics, delete hardware nodes, invent register ranges, or change clocks/interrupts merely to obtain a green workflow. First determine whether each issue is (a) a real DTS defect, (b) a donor-tree/5.15 schema-version mismatch, or (c) an inherited vendor binding exception. Record each disposition with evidence before changing the DTS.
 
 Current gate: **HOLD — DTBs compile, schema validation fails with diagnostics. No flashable DTB or boot image is approved.**
+
+
+## Addendum — reproducible stock FDT structural inventory (2026-11-15)
+
+The raw `boot_b-original.img` and the PVT1/PVT2 DTBs from Actions artifact `deen-c100-dtb-validation` were independently parsed with a standalone FDT structure reader.
+
+The boot image contains seven valid FDT blobs. The exact tuple `qcom,msm-id = <0x125 0>` and `qcom,board-id = <0x4D 0xC100>` selects the stock FDT at byte offset 12,026,378:
+- stock C100: 253,704 bytes, 1,471 nodes.
+- PVT1 candidate: 23,822 bytes, 248 nodes.
+- root `model` and three-entry `compatible` list match exactly.
+- structural path inventory: 1,429 stock-only paths, 206 candidate-only paths, 42 common paths.
+- among common paths, 98 stock property names are absent from the candidate and 16 candidate property names are not in stock.
+
+The PVT2 control tuple `<0x4D 0xC200>` also selects one of the seven stock FDTs (offset 11,265,270); its matching candidate has 248 nodes and 23,790 bytes. The C100 and C200 stock blobs are both 253,704 bytes and 1,471 nodes, but this does not make PVT2 relevant to the user's PVT1 device.
+
+**Interpretation:** this candidate is a minimal ACK/mainline-derived foundation, not a port of the complete stock vendor tree. Node-path differences include major topology differences (stock uses a large `/soc` tree while the candidate uses a smaller `/soc@0` tree), so raw path counts are an inventory signal, not a one-to-one count of missing physical devices. However, the current candidate is plainly far from a full stock-equivalent device tree. It must not be flashed.
+
+A dependency-free audit utility was added at `scripts/deen_dtb_audit.py` on the experimental branch. Example:
+```sh
+python3 scripts/deen_dtb_audit.py boot_b-original.img msm8953-motorola-deen-pvt1.dtb \
+  --msm-id 0x125,0 --board-id 0x4d,0xc100 --json c100-audit.json
+```
+The utility scans FDT blobs in a raw boot image, selects an exact MSM/board tuple, and reports node/property inventory. It explicitly does not claim semantic equivalence or bootability.
+
+Current gate remains **HOLD**. Next work is a subsystem-by-subsystem semantic comparison and source reconciliation against stock/known-good Deen DTS, not mass-copying the 4.19 vendor tree or suppressing schema diagnostics.
