@@ -1,0 +1,111 @@
+name: Deen 5.15 defconfig symbol audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deen-defconfig-audit.yml"
+      - "bootstrap/DEEN_DEFCONFIG_AUDIT"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: Resolve GKI plus Deen base fragment
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out project control branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Kconfig dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev
+
+      - name: Fetch pinned Deen bring-up source
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-config-src"
+          git fetch --no-tags --depth=1 origin \
+            +refs/heads/deen/dts-bringup:refs/remotes/origin/deen/dts-bringup
+          git worktree add --detach "$SRC" refs/remotes/origin/deen/dts-bringup
+          test -s "$SRC/arch/arm64/configs/deen-msm8953-base.fragment"
+          echo "source_sha=$(git -C "$SRC" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "fragment_sha256=$(sha256sum "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve GKI plus Deen base fragment
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-config-src"
+          OUT="$RUNNER_TEMP/deen-config-out"
+          mkdir -p "$OUT"
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 gki_defconfig
+
+          "$SRC/scripts/kconfig/merge_config.sh" -m -r -O "$OUT" \
+            "$OUT/.config" "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" \
+            2>&1 | tee "$RUNNER_TEMP/deen-config-merge.log"
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 olddefconfig
+
+          REQUIRED="ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 MAILBOX RPMSG QCOM_SMD_RPM QCOM_RPMPD SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC REGULATOR_QCOM_SMD_RPM REGULATOR_QCOM_SPMI REGULATOR_FIXED_VOLTAGE MMC MMC_SDHCI MMC_SDHCI_PLTFM MMC_SDHCI_MSM KEYBOARD_GPIO"
+          for symbol in $REQUIRED; do
+            grep -qx "CONFIG_${symbol}=y" "$OUT/.config" || {
+              echo "::error::Kconfig did not retain CONFIG_${symbol}=y"
+              exit 1
+            }
+          done
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 savedefconfig
+          test -s "$OUT/defconfig"
+          mkdir -p "$RUNNER_TEMP/deen-defconfig-audit"
+          cp "$OUT/.config" "$RUNNER_TEMP/deen-defconfig-audit/resolved.config"
+          cp "$OUT/defconfig" "$RUNNER_TEMP/deen-defconfig-audit/savedefconfig"
+          cp "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" \
+            "$RUNNER_TEMP/deen-defconfig-audit/deen-msm8953-base.fragment"
+          cp "$RUNNER_TEMP/deen-config-merge.log" \
+            "$RUNNER_TEMP/deen-defconfig-audit/merge.log"
+
+          {
+            echo "# Deen GKI defconfig audit"
+            echo
+            echo "- Base: pinned Android Common Kernel 5.15 `gki_defconfig`"
+            echo "- Deen source commit: ${{ steps.source.outputs.source_sha }}"
+            echo "- Fragment SHA-256: ${{ steps.source.outputs.fragment_sha256 }}"
+            echo "- Result: all 21 required MSM8953 bring-up symbols retained after `olddefconfig`."
+            echo "- Scope: minimal boot foundation only; not a complete Deen device defconfig."
+            echo "- Vendor KGSL/camera/audio/WLAN/display/touch/fingerprint and device-specific policy remain separate audited workstreams."
+            echo
+            echo "## Resolved required symbols"
+            for symbol in $REQUIRED; do
+              grep -E "^CONFIG_${symbol}=" "$OUT/.config"
+            done
+            echo
+            echo "## Hashes"
+            sha256sum "$OUT/.config" "$OUT/defconfig" \
+              "$SRC/arch/arm64/configs/deen-msm8953-base.fragment"
+          } > "$RUNNER_TEMP/deen-defconfig-audit/DEEN_DEFCONFIG_AUDIT.md"
+
+          echo "resolved_config_sha256=$(sha256sum "$OUT/.config" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "savedefconfig_sha256=$(sha256sum "$OUT/defconfig" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload resolved config audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-defconfig-symbol-audit
+          path: ${{ runner.temp }}/deen-defconfig-audit/
+          if-no-files-found: error
+          retention-days: 14
