@@ -9,7 +9,8 @@ on the Qualcomm WCNSS core.
 	Definition: must be one of:
 		    "qcom,riva-pil",
 		    "qcom,pronto-v1-pil",
-		    "qcom,pronto-v2-pil"
+		    "qcom,pronto-v2-pil",
+		    "qcom,pronto-v3-pil"
 
 - reg:
 	Usage: required
@@ -49,7 +50,7 @@ on the Qualcomm WCNSS core.
 		    booting of the WCNSS core
 
 - power-domains:
-	Usage: required (for qcom,pronto-v1/2-pil)
+	Usage: required (for qcom,pronto-v1/2/3-pil)
 	Value type: <phandle>
 	Definition: reference to the power domains to be held on behalf of the
 		    booting of the WCNSS core
@@ -57,7 +58,7 @@ on the Qualcomm WCNSS core.
 - power-domain-names:
 	Usage: required (for qcom,pronto-v1/2-pil)
 	Value type: <stringlist>
-	Definition: must be "cx", "mx"
+	Definition: must be "cx", "mx" for v1/v2 and "mx", "cx" for v3
 
 - qcom,smem-states:
 	Usage: optional
