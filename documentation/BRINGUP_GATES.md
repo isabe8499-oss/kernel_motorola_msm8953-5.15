@@ -93,6 +93,8 @@ The next semantic work is not another bulk config comparison: review exact drive
 
 Keep the 20-symbol minimal fragment limited to the currently enabled base DTS; do not mark it as the final `deen_defconfig`.
 
+A combined Deen defconfig + remoteproc Kconfig/object audit was added to check the 20-symbol base fragment, remoteproc dependencies and 13 platform/remoteproc objects together. Its first two attempts (runs `43707752474` and `43707836446`) failed before Kconfig resolution because of CI preflight defects: APT parsed a trailing continuation token as a package, then the LLVM alias directory was added to `GITHUB_PATH` but not exported in the current shell. These were workflow errors, not Kconfig/source failures. Both are fixed in commit `da2fd21613d2391c70e5f073391e2c42a552277b`; corrected run [`43708326408`](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43708326408) is in progress. Its result must be checked before declaring the combined config/object audit complete.
+
 ## Gate G — boot image integration and device validation: BLOCKED
 
 Do not produce or flash a boot image until:
