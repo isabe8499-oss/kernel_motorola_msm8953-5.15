@@ -2,3 +2,4 @@
 # Do not enable remoteproc nodes in the Deen board DTS or attempt runtime firmware boot in this gate.
 Requested: 2026-11-15
 Retry: fetch base commit before git diff --check.
+Retry: fix noncompliant ADSP schema title before validation.
