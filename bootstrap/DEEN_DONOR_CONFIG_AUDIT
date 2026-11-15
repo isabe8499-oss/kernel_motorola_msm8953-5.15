@@ -1,3 +1,4 @@
 # Trigger read-only 4.19 donor config inventory against ACK 5.15.
 # This must not import or enable donor options; it classifies Kconfig definitions and revalidates the 20-symbol Deen base fragment.
 Requested: 2026-11-15
+Retry after workflow variable/path correction: 2026-11-15
