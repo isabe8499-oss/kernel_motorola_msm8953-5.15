@@ -1,5 +1,5 @@
 # Dedicated C100 DTB validation. The source branch is fetched by the workflow input.
-Trigger request: 2026-11-15T12:06:00-03:00
+Push-triggered validation request: 2026-11-15T12:27:00-03:00
 Source branch: deen/c100-dtb-validation
 Source base: 8345f67abd78a0b6fc8e776c9279d9c88cdc5356
 Validation-only commit: e363945f62eed0a20c7b5fb5edb00c26370b25b0
