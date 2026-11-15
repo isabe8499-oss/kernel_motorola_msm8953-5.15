@@ -37,14 +37,13 @@
 
 ## Gate 5 — Peripheral ports and device tests
 
-1. Remoteproc object audit has passed in run 43702964898: MSS, ADSP PAS and Pronto-v3 AArch64 objects compile, and the ADSP YAML document validates. Keep branch `deen/msm8953-remoteproc-backports` isolated.
-2. Complete donor-to-5.15 resource mapping before DTS activation: the donor uses `qcom,pil-q6v55-mss` for modem and `qcom,pil-tz-generic` for ADSP/Pronto; Deen `misc.dtsi` disables all three related SMP2P endpoints. See `documentation/DEEN_REMOTEPROC_INTEGRATION_AUDIT.md`.
-3. Inspect the stock Android 12 vendor firmware and verify MBA/MPSS, ADSP and WCNSS images, hashes and lookup paths; map the donor memory pools against QSEE/SMEM and current DRAM/reserved-memory map; verify clocks, resets, power domains and SMEM/SMP2P routing.
-4. Only after resource/firmware review, create separate MSS and ADSP DTS candidates and validate each independently. Keep the WCNSS WLAN stack separate from Pronto remoteproc.
+1. Remoteproc object audit PASS: run 43702964898 compiled MSS, ADSP PAS and Pronto-v3 AArch64 objects and validated the ADSP YAML document. Keep `deen/msm8953-remoteproc-backports` isolated.
+2. Complete donor-to-5.15 resource mapping before DTS activation: donor modem uses `qcom,pil-q6v55-mss`; ADSP/Pronto use `qcom,pil-tz-generic`; Deen `misc.dtsi` disables the modem/ADSP/WCNSS SMP2P endpoints. See `documentation/DEEN_REMOTEPROC_INTEGRATION_AUDIT.md`.
+3. Inspect stock Android 12 vendor firmware and verify MBA/MPSS, ADSP and WCNSS images, hashes and search paths. Reconcile the donor memory pools against QSEE/SMEM and the actual DRAM map; verify clocks, resets, power domains and SMEM/SMP2P routing.
+4. Only after resource/firmware review, create separate MSS and ADSP DTS candidates and validate each independently. Keep WCNSS WLAN driver/HAL work separate from Pronto remoteproc.
 5. Port MSM8953 QUSB2 PHY data and reconcile DWC3 schema/driver handling in a separate branch.
-4. Resolve the NFC hardware conflict: donor 4.19 is NQ-NCI, while mainline reference is PN553.
-5. Port display/touch, GPU/KGSL, camera/audio, battery and thermal as isolated workstreams using the compatibility matrix.
-6. Build Image/DTBs and archive exact configs/hashes after each subsystem; only then generate the full Deen defconfig.
-7. Integrate only after boot layout, PVT and a rollback image are confirmed. No flash until a known-good recovery path exists.
+6. Resolve the NFC hardware conflict: donor 4.19 is NQ-NCI, while the mainline reference is PN553; verify the physical chip before choosing.
+7. Port display/touch, GPU/KGSL, camera/audio, battery and thermal as isolated driver/ABI workstreams.
+8. Rebuild Image/DTBs and archive exact configs/hashes after each subsystem; only then generate the full Deen defconfig. Integrate only after boot layout, PVT and a rollback image are confirmed. No flash until a known-good recovery path exists.
 
 No donor tree is to be modified. SUSFS, NoMount and all root/hiding features remain outside this clean baseline.
