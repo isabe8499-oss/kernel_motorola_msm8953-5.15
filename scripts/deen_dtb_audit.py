@@ -7,6 +7,7 @@ bootloader selection, or bootability.
 """
 import argparse
 import json
+from collections import Counter
 import struct
 import sys
 from pathlib import Path
@@ -103,6 +104,13 @@ def compatibles(node):
             node["props"].get("compatible", b"").split(b"\0") if x]
 
 
+def compatible_inventory(nodes_by_path):
+    counts = Counter()
+    for node in nodes_by_path.values():
+        counts.update(compatibles(node))
+    return [{"compatible": key, "node_count": counts[key]} for key in sorted(counts)]
+
+
 def scan(data):
     found, start = [], 0
     while True:
@@ -154,6 +162,14 @@ def main():
                      "stock_compatible": compatibles(stock["root"]),
                      "candidate_compatible": compatibles(candidate["root"])},
         "candidate": {"size_bytes": candidate["size"], "node_count": len(candidate["nodes"])},
+        "compatible_inventory": {
+            "stock": compatible_inventory(s),
+            "candidate": compatible_inventory(c),
+            "stock_compatible_strings_absent_from_candidate": sorted(
+                {x for node in s.values() for x in compatibles(node)}
+                - {x for node in c.values() for x in compatibles(node)}
+            ),
+        },
         "path_comparison": {
             "stock_only_node_paths": len(missing),
             "candidate_only_node_paths": len(extra),
