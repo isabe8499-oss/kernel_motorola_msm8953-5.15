@@ -102,7 +102,7 @@ jobs:
           name: deen-c100-structural-dtb-evidence
           path: |
             ${{ runner.temp }}/deen-dtb-hashes.txt
-          ${{ runner.temp }}/c100-structural-build.log
-          ${{ runner.temp }}/c100-debug/**
+            ${{ runner.temp }}/c100-structural-build.log
+            ${{ runner.temp }}/c100-debug/**
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
