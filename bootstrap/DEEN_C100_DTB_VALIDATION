@@ -12,3 +12,7 @@ Structural audit utility added; CI now syntax-checks it and reports DTB size dyn
 Reserved-memory inventory added to the stock/candidate FDT audit utility.
 
 Added evidence-backed MSM8953 Deen root, TSENS and dedicated SDC binding support for revalidation.
+
+Schema reconciliation v2 trigger request: 2026-11-15T14:12:00-03:00
+Validation source branch: deen/c100-schema-reconcile-v2
+Root compatible follows ACK 5.15 qcom.yaml; PVT1 qcom,msm-id and board-id are stock boot_b-backed. Preserve all schema diagnostics; unresolved diagnostics remain HOLD.
