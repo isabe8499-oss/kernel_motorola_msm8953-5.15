@@ -255,6 +255,7 @@ jobs:
           MEMORY_MONITOR_PID=$!
 
           set +e
+          BUILD_START_EPOCH="$(date +%s)"
           make -C "$SRC" O="$OUT" ARCH=arm64 \
             CROSS_COMPILE=aarch64-linux-gnu- \
             LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
@@ -267,10 +268,24 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/deen-image-build.log"
           BUILD_STATUS=${PIPESTATUS[0]}
           set -e
+
+          # Snapshot immediately: if the runner sends SIGTERM, this step may not
+          # reach its post-build section. These logs are emitted by the runner UI.
           kill "$MEMORY_MONITOR_PID" 2>/dev/null || true
           wait "$MEMORY_MONITOR_PID" 2>/dev/null || true
-          echo "Memory after build:"
+          BUILD_END_EPOCH="$(date +%s)"
+          echo "Build elapsed seconds: $((BUILD_END_EPOCH - BUILD_START_EPOCH))"
+          echo "Build command exit status: $BUILD_STATUS"
+          echo "===== immediate post-build memory snapshot $(date -u +%FT%TZ) ====="
           free -h
+          swapon --show
+          cat /proc/pressure/memory 2>/dev/null || true
+          if [[ -r /sys/fs/cgroup/memory.events ]]; then cat /sys/fs/cgroup/memory.events; fi
+          if [[ -r /proc/vmstat ]]; then
+            awk '/^(pswpin|pswpout|oom_kill|pgmajfault) / {print}' /proc/vmstat
+          fi
+          df -h "$RUNNER_TEMP"
+
           {
             echo "===== post-build diagnostics $(date -u +%FT%TZ) ====="
             if [[ -r /sys/fs/cgroup/memory.events ]]; then cat /sys/fs/cgroup/memory.events; fi
