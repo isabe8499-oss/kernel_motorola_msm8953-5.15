@@ -27,7 +27,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev \\
+            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev \
             dwarves binutils-aarch64-linux-gnu clang-18 lld-18 llvm-18
 
       - name: Fetch pinned Deen bring-up source
