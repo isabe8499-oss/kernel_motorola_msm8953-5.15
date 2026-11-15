@@ -50,13 +50,21 @@ It contains 20 selected symbols covering Qualcomm architecture/clock, MSM8953 GC
 
 It intentionally does not enable downstream KGSL, camera/audio techpacks, WLAN, NFC, fingerprint, display, touch or vendor power/thermal policy. Those require separate driver, binding, firmware and userspace ABI audits.
 
-## Resolution test in progress
+## Resolution test — PASS
 
-A dedicated short Kconfig audit was added:
+The corrected dedicated Kconfig audit passed:
 
-- Workflow: `.github/workflows/deen-defconfig-audit.yml`
-- It starts with the pinned ACK `gki_defconfig`, merges the Deen base fragment, runs `olddefconfig`, checks that all 20 required symbols survive, and produces `savedefconfig` plus the resolved `.config`.
-- It does not compile the full kernel and does not create a flashable image.
-- Passing this check validates only the minimal base fragment, not a complete device defconfig.
+- Workflow run: [43697546575](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/43697546575)
+- Job: `132761315172`
+- Source commit for the fragment: `ff2a86b64b9357bbb79435b8fa88ea94c52c4111`
+- Artifact: `deen-defconfig-symbol-audit`, ID `14155361150`
+- Artifact ZIP SHA-256: `76c282013135374c58aabb75d45a6563e2b6b78b50a163aaab9e894bc0c5471e`
+- Resolved `.config` SHA-256: `7fd7204305ffec3ea0e07acd93c081fb9e7ef81d52cf6a3c25516372e6e92a30`
+- Generated `savedefconfig` SHA-256: `870133b82ebc2a3adda0f53213e4b98050eb94af91437829aef54e5f2b92cd6a`
+- Fragment SHA-256: `0b62555f7b6743391a05f991c4c41f12242361bdf4163f36ac248ba63b13923d`
+
+The workflow starts from pinned ACK `gki_defconfig`, merges the Deen base fragment, runs `olddefconfig`, verifies all 20 required symbols and generates `savedefconfig`. The artifact was downloaded and independently inspected; all 20 expected `CONFIG_*=y` entries were present. Merge-log notices were ordinary redundant/redefined fragment settings; no required symbol was dropped.
+
+This validates only the minimal base fragment, not a complete device defconfig. It does not compile the kernel and does not create a flashable image.
 
 The final Deen device configuration remains gated on schema remediation, peripheral/firmware support and board revision evidence.
