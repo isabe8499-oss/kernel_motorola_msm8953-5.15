@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
 /*
  * Motorola One Deen PVT2 board candidate.
- * Board ID is retained from the clean Motorola 4.19 donor.
- *
- * Do not select for the handset until its board revision is independently
- * identified from the stock DTB/bootloader data.
+ * Root identity follows the stock Deen DTBs. PVT2 remains a control candidate;
+ * its full hardware equivalence has not been established.
  */
 
 /dts-v1/;
@@ -12,7 +10,7 @@
 #include "msm8953-motorola-deen-common.dtsi"
 
 / {
-	model = "Motorola One (Deen PVT2)";
-	compatible = "motorola,deen", "qcom,msm8953";
+	model = "deen";
+	compatible = "qcom,msm8953-deen", "qcom,msm8953-moto", "qcom,msm8953";
 	qcom,board-id = <0x4D 0xC200>;
 };
