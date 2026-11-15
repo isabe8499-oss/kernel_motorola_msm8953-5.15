@@ -47,9 +47,10 @@ jobs:
           test "$(grep -Ec 'CPU[0-7]: cpu@' "$DTS")" -eq 8
           test "$(grep -c 'l1-icache' "$DTS")" -eq 8
           test "$(grep -c 'l1-dcache' "$DTS")" -eq 8
-          test "$(grep -Ec 'L2_[01]: l2-cache_' "$DTS")" -eq 2
+          test "$(grep -c 'L2_0: l2-cache {' "$DTS")" -eq 1
+          test "$(grep -c 'L2_1: l2-cache {' "$DTS")" -eq 1
           test "$(grep -c 'cache-level = <2>;' "$DTS")" -eq 2
-          test "$(grep -c 'cache-unified;' "$DTS")" -eq 2
+          test "$(grep -c 'compatible = "arm,arch-cache";' "$DTS")" -eq 18
           echo "source cpu/cache inventory PASS"
 
       - name: Compile PVT1 and PVT2 DTBs
@@ -90,18 +91,17 @@ jobs:
             fdtget -l "$P1" /cpus | grep -Fx "cpu@$cpu"
             fdtget -l "$P1" "$CPU_PATH" | grep -Fx "l1-icache"
             fdtget -l "$P1" "$CPU_PATH" | grep -Fx "l1-dcache"
-            test "$(fdtget -t s "$P1" "$CPU_PATH/l1-icache" compatible)" = "cache"
-            test "$(fdtget -t s "$P1" "$CPU_PATH/l1-dcache" compatible)" = "cache"
+            test "$(fdtget -t s "$P1" "$CPU_PATH/l1-icache" compatible)" = "arm,arch-cache"
+            test "$(fdtget -t s "$P1" "$CPU_PATH/l1-dcache" compatible)" = "arm,arch-cache"
           done
 
-          test "$(fdtget -l "$P1" /cpus | grep -Ec '^l2-cache_[01]$')" -eq 2
-          test "$(fdtget -t x "$P1" /cpus/l2-cache_0 cache-level)" = "2"
-          test "$(fdtget -t x "$P1" /cpus/l2-cache_1 cache-level)" = "2"
-          fdtget -p "$P1" /cpus/l2-cache_0 | grep -Fx "cache-unified"
-          fdtget -p "$P1" /cpus/l2-cache_1 | grep -Fx "cache-unified"
+          test "$(fdtget -t s "$P1" /cpus/cpu@0/l2-cache compatible)" = "arm,arch-cache"
+          test "$(fdtget -t s "$P1" /cpus/cpu@100/l2-cache compatible)" = "arm,arch-cache"
+          test "$(fdtget -t x "$P1" /cpus/cpu@0/l2-cache cache-level)" = "2"
+          test "$(fdtget -t x "$P1" /cpus/cpu@100/l2-cache cache-level)" = "2"
 
-          L2_0="$(fdtget -t x "$P1" /cpus/l2-cache_0 phandle)"
-          L2_1="$(fdtget -t x "$P1" /cpus/l2-cache_1 phandle)"
+          L2_0="$(fdtget -t x "$P1" /cpus/cpu@0/l2-cache phandle)"
+          L2_1="$(fdtget -t x "$P1" /cpus/cpu@100/l2-cache phandle)"
           for cpu in 0 1 2 3; do
             test "$(fdtget -t x "$P1" "/cpus/cpu@$cpu" next-level-cache)" = "$L2_0"
           done
@@ -109,6 +109,8 @@ jobs:
             test "$(fdtget -t x "$P1" "/cpus/cpu@$cpu" next-level-cache)" = "$L2_1"
           done
 
+          test "$(fdtget -t s "$P1" / compatible)" = "qcom,msm8953-deen qcom,msm8953-moto qcom,msm8953"
+          test "$(fdtget -t s "$P2" / compatible)" = "qcom,msm8953-deen qcom,msm8953-moto qcom,msm8953"
           test "$(fdtget -t x "$P1" / qcom,msm-id)" = "125 0"
           test "$(fdtget -t x "$P1" / qcom,board-id)" = "4d c100"
           test "$(fdtget -t x "$P2" / qcom,board-id)" = "4d c200"
