@@ -17,3 +17,5 @@ Retry after restoring complete upstream MSM8953 SoC DTSI:
 - Restores SoC nodes and labels required by PM8953/common Deen DTS: spmi_bus, reserved-memory, pm8953_resin, rpm_requests, sdhc_1.
 - Structural gate updated to assert canonical upstream cache representation (two L2 nodes with cache-level=2; no invented cache-unified property).
 - Re-run must compile DTBs and inspect binary FDT before this source state is accepted.
+
+Re-run after adding verbose DTC/preprocessor evidence capture. Workflow commit: 99a3a7e6f456df852a65a325ac9b62eb235ae5c3. Preserve failure logs and command files; no placeholder labels. 2026-11-15.
