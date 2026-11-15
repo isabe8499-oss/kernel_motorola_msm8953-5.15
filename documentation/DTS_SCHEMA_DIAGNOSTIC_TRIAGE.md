@@ -56,3 +56,30 @@ Counts below are raw diagnostic lines across PVT1 and PVT2, not necessarily uniq
 - Device boot / flash: NOT AUTHORIZED.
 
 This audit intentionally makes no source-code changes to the imported DTSI files. It records the defect evidence and the controlled remediation path.
+
+
+## Comparative binding audit against Linux v6.1 — partial confirmation (2026-11-15)
+
+The schema/source-skew hypothesis has now been checked directly against the pinned ACK 5.15 binding files and the corresponding upstream Linux v6.1 files. This confirms that the 160 diagnostics are a mixture of real DTS contract issues and binding-version differences; they must not be treated as one category.
+
+| Area | ACK 5.15 binding vs Linux v6.1 | Finding / disposition |
+|---|---|---|
+| MSM8953 DWC3 | ACK `qcom,dwc3.yaml` does not list `qcom,msm8953-dwc3`; v6.1 explicitly lists it and has a two-interrupt conditional for this compatible | **Confirmed schema skew.** Do not add the compatible to the ACK schema alone. First compare the 5.15 DWC3 wrapper driver match data, clocks, interrupts, PHY and QUSB2 implementation. USB remains disabled/HOLD. |
+| PM8xxx RTC | ACK `qcom-pm8xxx-rtc.yaml` allows one `reg` item; v6.1 allows one or two and defines `reg-names` (`rtc`, `alarm`) | **Confirmed schema skew.** The Deen PM8953 RTC node's multi-region layout must also be checked against the actual ACK 5.15 RTC driver before deciding whether a minimal binding/driver backport or a DTS adaptation is correct. |
+| MSM8953 TSENS | ACK `qcom-tsens.yaml` does not list `qcom,msm8953-tsens`; v6.1 lists it as TSENS v2 | **Confirmed schema skew, runtime contract still open.** The ACK 5.15 TSENS driver must be checked for MSM8953 match data, calibration cells, register regions, sensor count and interrupt model before enabling the node. Thermal safety remains a P0 hold. |
+| MSM8953 pinctrl | ACK `qcom,msm8953-pinctrl.yaml` lacks `gpio-reserved-ranges` and the v6.1 binding adds a common pinctrl schema reference. Both versions require `function` in each matching `*-pins` child | **Mixed.** The missing `gpio-reserved-ranges` diagnostic can be version-related; child states missing `function` are not explained by this version difference and require DTS/driver inspection. Do not invent a function value. |
+| MSM8953 GCC | The ACK common `qcom,gcc.yaml` lists MSM8953; the v6.1 common binding delegates SoC-specific compatible handling and is more permissive | **No immediate compatible gap established.** Inspect the exact node properties and ACK driver contract rather than labeling all GCC diagnostics schema skew. |
+| RPM power domains | Both inspected `qcom,rpmpd.yaml` versions list `qcom,msm8953-rpmpd` | **Not explained by compatible-list skew.** Investigate the node's OPP table, power-domain cells and the exact Deen backport contract. |
+| APCS mailbox | Both versions recognize the MSM8953 compatible, but v6.1 expresses legacy compatible fallback through an ordered `oneOf` sequence including `syscon`; ACK uses a simpler enum | **Potential binding-shape skew.** Verify the actual node compatible list and the 5.15 mailbox driver before any DTS change. |
+
+This comparison establishes the existence of specific binding-version differences; it does not establish that every affected DTS node is safe or that a v6.1 binding can be copied wholesale into ACK 5.15. The exact 5.15 driver implementation and compatible table remain authoritative for runtime support.
+
+### Required next actions
+
+1. Build a per-node diagnostic map from the actual PVT DTBs, retaining JSON paths and diagnostic keywords rather than counting raw log lines only.
+2. For each affected enabled node, compare the binding with the exact ACK driver match table and probe path.
+3. For inherited but unused peripherals, determine whether they are safe to leave disabled in the source DTB; do not delete nodes solely to make validation quiet.
+4. Implement narrowly scoped DTS/binding/driver changes only where the 5.15 contract is understood; keep USB, RTC, TSENS, pinctrl and RPM work isolated.
+5. Require zero untriaged diagnostics for enabled Deen nodes and rerun binary read-back of board IDs, QSEE, reserved-memory and eMMC after every change.
+
+Source comparison refs: `torvalds/linux:v6.1` and the repository's pinned `deen/dts-bringup` ACK 5.15 source. No imported SoC/PMIC DTSI, binding or driver was modified during this audit.
