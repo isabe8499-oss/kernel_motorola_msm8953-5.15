@@ -64,7 +64,7 @@ The standard 16 GiB runner is no longer treated as a valid execution target for 
 
 Verified output SHA-256 values: Image `85584de409a2dbb019286532d53dcb3e6c07bf82ea46629035c28d9abe2191c8`; PVT1 DTB `41a0106d6ade5492497a6736a9c930c82f85fe3c909791968f3f7b0726fe5532`; PVT2 DTB `c06cc92f0487675277588594e03c1ad49eb5e69ff43ae7924bec2f50cb371055`. Artifact ZIP inspection confirmed an ARM64 kernel Image and two DTB v17 files (23,786 bytes each); headers are structurally consistent and both DTBs are included in the successful build. This is not DT schema acceptance, device-specific defconfig approval, hardware PVT selection, boot.img, or Full LTO validation.
 
-The build still uses generic GKI configuration plus the audited MSM8953 platform/PMIC/eMMC options, then attempts to link the complete ARM64 Image and build both Deen candidate DTBs. This is not the final Deen defconfig and not a boot image. Full success, hashes and artifact inspection are required before Gate D can pass.
+The generic GKI feasibility build already linked the ARM64 Image and both candidate DTBs in run `43684266664` using ThinLTO+CFI; its artifacts and hashes were independently verified. Gate D therefore passes for ThinLTO feasibility, while the separate Full LTO final gate remains HOLD. This is not the final Deen defconfig and not a boot image.
 
 ## Gate E — identify actual handset hardware revision: BLOCKED ON DEVICE EVIDENCE
 
@@ -74,13 +74,18 @@ The clean 4.19 donor contains:
 
 The physical revision in the XT1941-3 handset is unknown. Do not choose a production DTB based on the model number alone. Use the read-only bootloader queries in documentation/HARDWARE_IDENTIFICATION_GATE.md to collect only product, board and hwrev. Do not send full fastboot getvar all, because it can include device identifiers.
 
-## Gate F — Deen-specific defconfig and device tree completion: NOT STARTED
+## Gate F — minimal Deen Kconfig fragment: PASS / complete device defconfig: HOLD
 
-Must wait for Gate D and Gate E. Then:
-1. Create a Deen defconfig from the pinned ACK Kconfig; never transplant the 4.19 defconfig wholesale.
-2. Audit the full reserved-memory, console, clocks, pinctrl, regulators, eMMC, thermal and remote-processor dependency graph.
-3. Port subsystems in isolated patches and compile/test each group.
-4. Verify proprietary firmware and userspace ABI assumptions against the Android 12 vendor baseline and target Android 14 ROM.
+The minimal base fragment passed Kconfig resolution in run `43697546575`:
+- It merges with the pinned ACK `gki_defconfig`.
+- All 20 required MSM8953 base symbols survive `olddefconfig`.
+- `savedefconfig` and the fully resolved `.config` were generated and archived as artifact `14155361150`.
+- Detailed symbol inventory and hashes: `documentation/DEEN_DEFCONFIG_SYMBOL_AUDIT.md`.
+
+This is not a complete Deen device defconfig. The full config remains gated on board revision evidence, clean DTS schema validation and subsystem-by-subsystem driver/firmware/userspace ABI audit. Next:
+1. Map the remaining donor 4.19 config symbols one by one to an ACK 5.15 Kconfig symbol or an explicitly deferred vendor subsystem.
+2. Audit downstream KGSL/Adreno 506, camera-legacy/VFE/ISPIF, audio-legacy, WLAN, NFC, fingerprint, touch/display, sensors and power/thermal requirements before adding their symbols.
+3. Keep the current minimal fragment limited to the drivers used by the base DTS; do not mark it as the final `deen_defconfig`.
 
 ## Gate G — boot image integration and device validation: BLOCKED
 
