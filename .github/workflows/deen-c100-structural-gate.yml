@@ -34,8 +34,10 @@ jobs:
         run: |
           set -euo pipefail
           git clone --depth=1 --branch "$SOURCE_BRANCH" https://github.com/${GITHUB_REPOSITORY}.git "$RUNNER_TEMP/deen-src"
+          SOURCE_SHA="$(git -C "$RUNNER_TEMP/deen-src" rev-parse HEAD)"
           echo "branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
-          echo "sha=$(git -C "$RUNNER_TEMP/deen-src" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "Experimental source: $SOURCE_BRANCH @ $SOURCE_SHA"
 
       - name: Assert source CPU and cache inventory
         run: |
@@ -46,6 +48,7 @@ jobs:
           test "$(grep -c 'l1-dcache' "$DTS")" -eq 8
           test "$(grep -Ec 'L2_[01]: l2-cache_' "$DTS")" -eq 2
           test "$(grep -c 'cache-level = <2>;' "$DTS")" -eq 2
+          test "$(grep -c 'cache-unified;' "$DTS")" -eq 2
           echo "source cpu/cache inventory PASS"
 
       - name: Compile PVT1 and PVT2 DTBs
@@ -86,8 +89,49 @@ jobs:
           for cpu in 0 1 2 3 100 101 102 103; do
             fdtget -l "$P1" /cpus | grep -Fx "cpu@$cpu"
           done
-          test "$(fdtget -l "$P1" /cpus/cpu@0 | grep -Ec '^l1-(icache|dcache)$')" -eq 2
-          test "$(fdtget -l "$P1" /cpus | grep -Ec '^l2-cache_[01]$')" -eq 2
+          for cpu in 0 1 2 3 100 101 102 103; do
+            CPU_PATH="/cpus/cpu@$cpu"
+            test "$(fdtget -l "$P1" "$CPU_PATH" | grep -Ec '^l1-(icache|dcache)
+          test "$(fdtget -t x "$P1" / qcom,board-id)" = "4d c100"
+          test "$(fdtget -t x "$P2" / qcom,board-id)" = "4d c200"
+          test "$(fdtget -t x "$P1" /cpus/l2-cache_0 cache-level)" = "2"
+          test "$(fdtget -t x "$P1" /cpus/l2-cache_1 cache-level)" = "2"
+          fdtget "$P1" /cpus/l2-cache_0 compatible
+          sha256sum "$P1" "$P2" | tee "$RUNNER_TEMP/deen-dtb-hashes.txt"
+
+      - name: Upload structural evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-structural-dtb-evidence
+          path: |
+            ${{ runner.temp }}/deen-dtb-hashes.txt
+            ${{ runner.temp }}/c100-structural-build.log
+            ${{ runner.temp }}/c100-debug/**
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
+)" -eq 2
+          done
+          test "$(fdtget -l "$P1" /cpus | grep -Ec '^l2-cache_[01]
+          test "$(fdtget -t x "$P1" / qcom,board-id)" = "4d c100"
+          test "$(fdtget -t x "$P2" / qcom,board-id)" = "4d c200"
+          test "$(fdtget -t x "$P1" /cpus/l2-cache_0 cache-level)" = "2"
+          test "$(fdtget -t x "$P1" /cpus/l2-cache_1 cache-level)" = "2"
+          fdtget "$P1" /cpus/l2-cache_0 compatible
+          sha256sum "$P1" "$P2" | tee "$RUNNER_TEMP/deen-dtb-hashes.txt"
+
+      - name: Upload structural evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-structural-dtb-evidence
+          path: |
+            ${{ runner.temp }}/deen-dtb-hashes.txt
+            ${{ runner.temp }}/c100-structural-build.log
+            ${{ runner.temp }}/c100-debug/**
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
+)" -eq 2
+          fdtget "$P1" /cpus/l2-cache_0 cache-unified
+          fdtget "$P1" /cpus/l2-cache_1 cache-unified
           test "$(fdtget -t x "$P1" / qcom,msm-id)" = "125 0"
           test "$(fdtget -t x "$P1" / qcom,board-id)" = "4d c100"
           test "$(fdtget -t x "$P2" / qcom,board-id)" = "4d c200"
