@@ -1,3 +1,4 @@
 # Trigger a targeted Kconfig, binding and object-build audit for the isolated MSM8953 remoteproc backports.
 # Do not enable remoteproc nodes in the Deen board DTS or attempt runtime firmware boot in this gate.
 Requested: 2026-11-15
+Retry: fetch base commit before git diff --check.
