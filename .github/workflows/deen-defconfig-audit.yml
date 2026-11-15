@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
     paths:
-      - ".github/workflows/deen-defconfig-audit.yml"
       - "bootstrap/DEEN_DEFCONFIG_AUDIT"
   workflow_dispatch:
 
@@ -81,10 +80,10 @@ jobs:
           {
             echo "# Deen GKI defconfig audit"
             echo
-            echo "- Base: pinned Android Common Kernel 5.15 `gki_defconfig`"
+            echo "- Base: pinned Android Common Kernel 5.15 gki_defconfig"
             echo "- Deen source commit: ${{ steps.source.outputs.source_sha }}"
             echo "- Fragment SHA-256: ${{ steps.source.outputs.fragment_sha256 }}"
-            echo "- Result: all 21 required MSM8953 bring-up symbols retained after `olddefconfig`."
+            echo "- Result: all 20 required MSM8953 bring-up symbols retained after olddefconfig."
             echo "- Scope: minimal boot foundation only; not a complete Deen device defconfig."
             echo "- Vendor KGSL/camera/audio/WLAN/display/touch/fingerprint and device-specific policy remain separate audited workstreams."
             echo
