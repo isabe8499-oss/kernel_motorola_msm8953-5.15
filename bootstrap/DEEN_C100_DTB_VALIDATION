@@ -1,0 +1,6 @@
+# Dedicated C100 DTB validation. The source branch is fetched by the workflow input.
+Trigger request: 2026-11-15T12:06:00-03:00
+Source branch: deen/c100-dtb-match
+Expected root metadata: qcom,msm-id=<0x125 0>; qcom,board-id=<0x4D 0xC100>.
+Expected PVT2 control remains qcom,board-id=<0x4D 0xC200>.
+Only CI compile/readback/schema validation; never publish or flash an image.
