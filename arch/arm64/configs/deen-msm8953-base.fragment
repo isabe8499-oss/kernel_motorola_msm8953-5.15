@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Minimal MSM8953/Deen bring-up fragment for Android Common Kernel 5.15.
+# Apply on top of the pinned android14-5.15-lts gki_defconfig.
+#
+# Scope: Qualcomm SoC, clock, pinctrl, RPM/RPMPD, SPMI/PMIC regulators,
+# primary SDHCI/eMMC and GPIO keys used by the current minimal Deen DTS.
+#
+# This is NOT a complete device defconfig. It intentionally excludes
+# downstream KGSL, camera/audio techpacks, WLAN, NFC, fingerprint, display,
+# touch and vendor power/thermal stacks pending individual API/firmware audits.
+#
+CONFIG_ARCH_QCOM=y
+CONFIG_COMMON_CLK_QCOM=y
+CONFIG_MSM_GCC_8953=y
+CONFIG_PINCTRL_MSM=y
+CONFIG_PINCTRL_MSM8953=y
+CONFIG_MAILBOX=y
+CONFIG_RPMSG=y
+CONFIG_QCOM_SMD_RPM=y
+CONFIG_QCOM_RPMPD=y
+CONFIG_SPMI=y
+CONFIG_SPMI_MSM_PMIC_ARB=y
+CONFIG_MFD_SPMI_PMIC=y
+CONFIG_REGULATOR_QCOM_SMD_RPM=y
+CONFIG_REGULATOR_QCOM_SPMI=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_MMC=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_PLTFM=y
+CONFIG_MMC_SDHCI_MSM=y
+CONFIG_KEYBOARD_GPIO=y
