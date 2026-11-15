@@ -93,6 +93,7 @@ jobs:
           set -euo pipefail
           SRC="$RUNNER_TEMP/deen-rproc-src"
           BASE="${{ steps.source.outputs.base_sha }}"
+          git -C "$SRC" fetch --no-tags --depth=1 origin "$BASE"
           git -C "$SRC" diff --check "$BASE" HEAD
 
           grep -q '"qcom,msm8953-mss-pil"' "$SRC/drivers/remoteproc/qcom_q6v5_mss.c"
