@@ -27,7 +27,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev
+            bc bison build-essential flex libelf-dev libssl-dev libncurses-dev \\
+            dwarves binutils-aarch64-linux-gnu clang-18 lld-18 llvm-18
 
       - name: Fetch pinned Deen bring-up source
         id: source
@@ -41,6 +42,24 @@ jobs:
           test -s "$SRC/arch/arm64/configs/deen-msm8953-base.fragment"
           echo "source_sha=$(git -C "$SRC" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "fragment_sha256=$(sha256sum "$SRC/arch/arm64/configs/deen-msm8953-base.fragment" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Expose pinned LLVM 18 tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/llvm-bin"
+          for tool in clang clang++ ld.lld llvm-ar llvm-nm llvm-objcopy llvm-objdump llvm-strip; do
+            for candidate in "/usr/lib/llvm-18/bin/$tool" "/usr/bin/$tool-18" "/usr/bin/$tool"; do
+              if [[ -x "$candidate" ]]; then
+                ln -sf "$candidate" "$RUNNER_TEMP/llvm-bin/$tool"
+                break
+              fi
+            done
+          done
+          echo "$RUNNER_TEMP/llvm-bin" >> "$GITHUB_PATH"
+          test -x "$RUNNER_TEMP/llvm-bin/ld.lld"
+          clang-18 --version
+          ld.lld --version
 
       - name: Resolve GKI plus Deen base fragment
         id: resolve
@@ -60,9 +79,27 @@ jobs:
           make -C "$SRC" O="$OUT" ARCH=arm64 olddefconfig
 
           REQUIRED="ARCH_QCOM COMMON_CLK_QCOM MSM_GCC_8953 PINCTRL_MSM PINCTRL_MSM8953 MAILBOX RPMSG QCOM_SMD_RPM QCOM_RPMPD SPMI SPMI_MSM_PMIC_ARB MFD_SPMI_PMIC REGULATOR_QCOM_SMD_RPM REGULATOR_QCOM_SPMI REGULATOR_FIXED_VOLTAGE MMC MMC_SDHCI MMC_SDHCI_PLTFM MMC_SDHCI_MSM KEYBOARD_GPIO"
+          REMOTEPROC_REQUIRED="REMOTEPROC QCOM_SMEM RPMSG_QCOM_SMD QCOM_SYSMON QCOM_Q6V5_MSS QCOM_Q6V5_PAS QCOM_WCNSS_PIL QCOM_RPROC_COMMON QCOM_Q6V5_COMMON QCOM_MDT_LOADER QCOM_PIL_INFO QCOM_SCM"
+          "$SRC/scripts/config" --file "$OUT/.config" \
+            --enable REMOTEPROC \
+            --enable RPMSG_QCOM_SMD \
+            --enable QCOM_SMEM \
+            --enable QCOM_SYSMON \
+            --enable QCOM_Q6V5_MSS \
+            --enable QCOM_Q6V5_PAS \
+            --enable QCOM_WCNSS_PIL
+          make -C "$SRC" O="$OUT" ARCH=arm64 olddefconfig
           for symbol in $REQUIRED; do
             grep -qx "CONFIG_${symbol}=y" "$OUT/.config" || {
               echo "::error::Kconfig did not retain CONFIG_${symbol}=y"
+              exit 1
+            }
+          done
+
+          for symbol in $REMOTEPROC_REQUIRED; do
+            grep -qx "CONFIG_${symbol}=y" "$OUT/.config" || {
+              echo "::error::remoteproc Kconfig dependency did not retain CONFIG_${symbol}=y"
+              grep -E "^(CONFIG_${symbol}=|# CONFIG_${symbol} is not set)" "$OUT/.config" || true
               exit 1
             }
           done
@@ -76,6 +113,8 @@ jobs:
             "$RUNNER_TEMP/deen-defconfig-audit/deen-msm8953-base.fragment"
           cp "$RUNNER_TEMP/deen-config-merge.log" \
             "$RUNNER_TEMP/deen-defconfig-audit/merge.log"
+          cp "$RUNNER_TEMP/deen-config-out/.config" \
+            "$RUNNER_TEMP/deen-defconfig-audit/resolved.config"
 
           {
             echo "# Deen GKI defconfig audit"
@@ -83,12 +122,18 @@ jobs:
             echo "- Base: pinned Android Common Kernel 5.15 gki_defconfig"
             echo "- Deen source commit: ${{ steps.source.outputs.source_sha }}"
             echo "- Fragment SHA-256: ${{ steps.source.outputs.fragment_sha256 }}"
-            echo "- Result: all 20 required MSM8953 bring-up symbols retained after olddefconfig."
+            echo "- Result: all base MSM8953 symbols and all remoteproc dependencies retained after olddefconfig."
+            echo "- Remote processors: MSS, ADSP PAS and WCNSS Kconfig paths enabled for compile audit."
             echo "- Scope: minimal boot foundation only; not a complete Deen device defconfig."
             echo "- Vendor KGSL/camera/audio/WLAN/display/touch/fingerprint and device-specific policy remain separate audited workstreams."
             echo
             echo "## Resolved required symbols"
             for symbol in $REQUIRED; do
+              grep -E "^CONFIG_${symbol}=" "$OUT/.config"
+            done
+            echo
+            echo "## Resolved remoteproc symbols"
+            for symbol in $REMOTEPROC_REQUIRED; do
               grep -E "^CONFIG_${symbol}=" "$OUT/.config"
             done
             echo
@@ -99,6 +144,85 @@ jobs:
 
           echo "resolved_config_sha256=$(sha256sum "$OUT/.config" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
           echo "savedefconfig_sha256=$(sha256sum "$OUT/defconfig" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Compile Deen platform and remoteproc driver objects
+        id: objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-config-src"
+          OUT="$RUNNER_TEMP/deen-config-out"
+          export PATH="$RUNNER_TEMP/llvm-bin:$PATH"
+          mkdir -p "$RUNNER_TEMP/deen-defconfig-audit/objects"
+
+          make -C "$SRC" O="$OUT" ARCH=arm64 \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            LLVM=1 CC=clang-18 LD=ld.lld HOSTLD=ld.lld AR=llvm-ar-18 \
+            NM=llvm-nm-18 OBJCOPY=llvm-objcopy-18 \
+            OBJDUMP=llvm-objdump-18 STRIP=llvm-strip-18 \
+            HOSTCC=clang-18 HOSTCXX=clang++-18 -j1 \
+            drivers/clk/qcom/gcc-msm8953.o \
+            drivers/pinctrl/qcom/pinctrl-msm8953.o \
+            drivers/spmi/spmi-pmic-arb.o \
+            drivers/mfd/qcom-spmi-pmic.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
+            drivers/regulator/qcom_smd-regulator.o \
+            drivers/regulator/qcom_spmi-regulator.o \
+            drivers/mmc/host/sdhci-msm.o \
+            drivers/input/keyboard/gpio_keys.o \
+            drivers/remoteproc/qcom_q6v5_mss.o \
+            drivers/remoteproc/qcom_q6v5_pas.o \
+            drivers/remoteproc/qcom_wcnss.o \
+            2>&1 | tee "$RUNNER_TEMP/deen-defconfig-audit/object-build.log"
+
+          for object in \
+            drivers/clk/qcom/gcc-msm8953.o \
+            drivers/pinctrl/qcom/pinctrl-msm8953.o \
+            drivers/spmi/spmi-pmic-arb.o \
+            drivers/mfd/qcom-spmi-pmic.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
+            drivers/regulator/qcom_smd-regulator.o \
+            drivers/regulator/qcom_spmi-regulator.o \
+            drivers/mmc/host/sdhci-msm.o \
+            drivers/input/keyboard/gpio_keys.o \
+            drivers/remoteproc/qcom_q6v5_mss.o \
+            drivers/remoteproc/qcom_q6v5_pas.o \
+            drivers/remoteproc/qcom_wcnss.o; do
+            test -s "$OUT/$object" || { echo "::error::Missing object $object"; exit 1; }
+            mkdir -p "$RUNNER_TEMP/deen-defconfig-audit/objects/$(dirname "$object")"
+            cp "$OUT/$object" "$RUNNER_TEMP/deen-defconfig-audit/objects/$object"
+          done
+
+          sha256sum \
+            "$OUT/drivers/clk/qcom/gcc-msm8953.o" \
+            "$OUT/drivers/pinctrl/qcom/pinctrl-msm8953.o" \
+            "$OUT/drivers/spmi/spmi-pmic-arb.o" \
+            "$OUT/drivers/mfd/qcom-spmi-pmic.o" \
+            "$OUT/drivers/soc/qcom/smd-rpm.o" \
+            "$OUT/drivers/soc/qcom/rpmpd.o" \
+            "$OUT/drivers/regulator/qcom_smd-regulator.o" \
+            "$OUT/drivers/regulator/qcom_spmi-regulator.o" \
+            "$OUT/drivers/mmc/host/sdhci-msm.o" \
+            "$OUT/drivers/input/keyboard/gpio_keys.o" \
+            "$OUT/drivers/remoteproc/qcom_q6v5_mss.o" \
+            "$OUT/drivers/remoteproc/qcom_q6v5_pas.o" \
+            "$OUT/drivers/remoteproc/qcom_wcnss.o" \
+            > "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt"
+
+          cat >> "$RUNNER_TEMP/deen-defconfig-audit/DEEN_DEFCONFIG_AUDIT.md" <<EOF
+
+          ## Object compile audit
+
+          - Result: PASS — 13 selected MSM8953 platform and remoteproc objects compiled.
+          - Full Image link, DTB schema acceptance, firmware load and device boot are not part of this gate.
+
+          ```text
+          $(cat "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt")
+          ```
+          EOF
+          cat "$RUNNER_TEMP/deen-defconfig-audit/object-sha256.txt" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload resolved config audit
         if: always()
