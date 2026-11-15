@@ -58,7 +58,7 @@ An isolated branch was created from the current Deen bring-up base:
 
 - Branch: `deen/msm8953-remoteproc-backports`
 - Base commit: `ff2a86b64b9357bbb79435b8fa88ea94c52c4111`
-- Current branch head: `344a24deb611eef446269bbe877f7379338b4b7c`
+- Current branch head: `12366f09d36b13ab47eec139ea4aec574c59fdef`
 
 It contains six focused commits:
 1. Add the MSM8953 MSS resource descriptor, reset/memory sequence and PAS memory setup to `qcom_q6v5_mss.c`, adapted to the fields available in ACK 5.15.
