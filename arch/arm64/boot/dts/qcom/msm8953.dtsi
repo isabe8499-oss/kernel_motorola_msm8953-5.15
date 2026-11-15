@@ -7,8 +7,142 @@
 #include <dt-bindings/power/qcom-rpmpd.h>
 #include <dt-bindings/thermal/thermal.h>
 
-/*
- * NOTE: cache-node content below is kept conservative: Cortex-A53 has
- * separate L1 instruction/data caches and a unified L2 cluster cache.
- * cache-unified is set only for L2. L1 split nodes intentionally omit it.
- */
+/ {
+	interrupt-parent = <&intc>;
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	chosen { };
+
+	clocks {
+		sleep_clk: sleep-clk {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <32768>;
+		};
+
+		xo_board: xo-board {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <19200000>;
+			clock-output-names = "xo";
+		};
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		CPU0: cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x0>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_0>;
+			#cooling-cells = <2>;
+			l1-icache {
+				compatible = "cache";
+				cache-level = <1>;
+			};
+			l1-dcache {
+				compatible = "cache";
+				cache-level = <1>;
+			};
+		};
+		CPU1: cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x1>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_0>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+		CPU2: cpu@2 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x2>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_0>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+		CPU3: cpu@3 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x3>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_0>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+		CPU4: cpu@100 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x100>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_1>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+		CPU5: cpu@101 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x101>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_1>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+		CPU6: cpu@102 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x102>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_1>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+		CPU7: cpu@103 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x103>;
+			enable-method = "psci";
+			capacity-dmips-mhz = <1024>;
+			next-level-cache = <&L2_1>;
+			#cooling-cells = <2>;
+			l1-icache { compatible = "cache"; cache-level = <1>; };
+			l1-dcache { compatible = "cache"; cache-level = <1>; };
+		};
+
+		L2_0: l2-cache_0 {
+			compatible = "cache";
+			cache-level = <2>;
+			cache-unified;
+		};
+		L2_1: l2-cache_1 {
+			compatible = "cache";
+			cache-level = <2>;
+			cache-unified;
+		};
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x0>;
+	};
+};
