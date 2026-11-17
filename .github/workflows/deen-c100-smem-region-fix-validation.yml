@@ -59,6 +59,7 @@ jobs:
           grep -Fq 'hwlocks = <&tcsr_mutex 3>;' "$DTS"
 
       - name: Compile PVT1 and PVT2 DTBs
+        id: compile
         run: |
           set -euo pipefail
           SRC="$RUNNER_TEMP/deen-src"
