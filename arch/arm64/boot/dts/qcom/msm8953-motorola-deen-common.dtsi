@@ -38,6 +38,28 @@
 	};
 };
 
+
+/*
+ * Keep the SMEM reservation separate from the qcom,smem platform device.
+ * The ACK 5.15 driver maps the region through the device's memory-region
+ * phandle; putting qcom,smem on the reserved-memory child makes the driver
+ * probe the reservation node itself without that required phandle.
+ */
+&smem_mem {
+	/delete-property/ compatible;
+	/delete-property/ qcom,rpm-msg-ram;
+	/delete-property/ hwlocks;
+};
+
+/ {
+	smem {
+		compatible = "qcom,smem";
+		memory-region = <&smem_mem>;
+		qcom,rpm-msg-ram = <&rpm_msg_ram>;
+		hwlocks = <&tcsr_mutex 3>;
+	};
+};
+
 / {
 	vph_pwr: regulator-vph-pwr {
 		compatible = "regulator-fixed";
