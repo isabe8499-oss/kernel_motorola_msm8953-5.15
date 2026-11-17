@@ -1,0 +1,4 @@
+Run isolated validation of branch deen/c100-smem-memory-region-fix.
+Expected source commit: 8dd376a6291729fd388622d6058fa8a0e0cd5df5.
+Scope: compile PVT1/PVT2, verify /smem memory-region phandle resolves to /reserved-memory/memory@86300000, ensure SMEM controller properties are not attached to reserved-memory node, and check whether qcom,smem schema diagnostics are removed.
+This does not approve full memory ownership, firmware/IPC, boot packaging, or flashing.
