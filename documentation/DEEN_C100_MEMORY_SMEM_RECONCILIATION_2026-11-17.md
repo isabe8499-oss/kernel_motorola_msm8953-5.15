@@ -49,31 +49,49 @@ The TZ log and watchdog CPU-context intervals are exactly adjacent: TZ log ends 
 
 These arithmetic checks establish interval relationships only. They do not prove that all consumers, attributes, cacheability, ownership, or boot-time reservations are equivalent.
 
-## 2. Stock other_ext, QSEE and SMEM — corrected evidence
+## 2. Stock other_ext, QSEE and SMEM — candidate parsed, semantics unresolved
 
-The stock C100 FDT audit establishes:
+### Stock C100 FDT evidence
+
+The committed stock-FDT audit records:
 - `other_ext_region@0`: base `0x84300000`, size `0x02500000` (37 MiB), compatible `removed-dma-pool`, with `no-map`.
-- A separate stock SMEM device node at `/soc/qcom,smem@86300000` (path and unit address recorded in the sequenced audit).
-- Stock also contains dynamic/reusable shared-dma-pool nodes for ADSP, GPU, QSEECom, secure and Venus; their fixed `reg` values are not present in the summarized FDT audit and must be recovered from the raw FDT properties and references.
+- A separate SMEM device node at `/soc/qcom,smem@86300000`.
+- Dynamic/reusable shared-dma-pool nodes for ADSP, GPU, QSEECom, secure and Venus. Their fixed `reg` values are not present in the summarized report and must be recovered from the raw stock FDT.
 
-The candidate evidence recorded in the stock-vs-candidate audit is:
-- `qseecom@84300000`: fixed 32 MiB no-map reservation, spanning `[0x84300000, 0x86300000)`.
-- Candidate has separate entries beginning at `0x86300000` and `0x86400000`, but their exact semantics and sizes are not established by the audit summary.
-- The candidate SMEM representation was flagged by schema diagnostics: it places `qcom,smem` on a reserved-memory node rather than reproducing the stock SMEM device node plus its memory-region relationship.
+The stock audit does **not** establish that SMEM is a carveout within `other_ext_region`, or that the stock 37 MiB pool is intended to be divided into the candidate's three fixed nodes.
 
-**Confirmed arithmetic only:** the candidate QSEE interval ends at `0x86300000`, the same base encoded in the stock SMEM node path. This proves adjacency of two addresses only. It does not prove that SMEM occupies the next 1 MiB, that the 4 MiB interval `[0x86400000,0x86800000)` exists as a candidate reservation, or that either interval is owned by `other_ext_region`.
+### Candidate PVT1 DTB artifact — independently parsed
 
-**Withdrawn conclusion:** the prior claim that QSEE 32 MiB + SMEM 1 MiB + another 4 MiB forms a confirmed candidate partition of the stock 37 MiB `other_ext_region` is unsupported and superseded. Do not use that partition as a design assumption.
+Artifact `deen-c100-dtb-validation`, run `43763534296`, artifact ID `14180369413`; PVT1 DTB SHA-256 `2c5fb810fdfcae65768167327bdb4ac4ba824aea6cfa2dc4b5117838aa9ae442`.
 
-Required evidence before any DTS change:
-1. Parse the selected raw stock C100 FDT node `/reserved-memory/other_ext_region@0` and `/soc/qcom,smem@86300000`; record exact `compatible`, `reg`, `#address-cells`, `#size-cells`, `ranges`, `no-map`, `reusable`, hwlock, RPM message-RAM references and phandles.
-2. Enumerate all stock nodes with `memory-region`, `memory-region-names`, QSEE/QSEECom, secure shared-memory, SMEM and DMA-pool references; resolve each phandle to its target node.
-3. Recover exact candidate DTS source and compiled DTB for the same commit. Do not infer candidate sizes or labels from an address appearing in a diagnostic.
-4. Identify all consumers of the 32 MiB candidate QSEE reservation and any entries at `0x86300000` / `0x86400000`; prove whether they are device resources, carveouts, suballocations or unrelated address ranges.
-5. Trace the ACK 5.15 QSEE/SCM, SMEM, RPM/SMD and remoteproc consumers, including hwlock and RPM message RAM contracts.
+The compiled candidate contains these adjacent no-map reservations:
+
+| Candidate node | Start | Size | End (exclusive) | Properties |
+|---|---:|---:|---:|---|
+| `qseecom@84300000` | `0x84300000` | 32 MiB | `0x86300000` | `no-map` |
+| `memory@86300000` | `0x86300000` | 1 MiB | `0x86400000` | `compatible = "qcom,smem"`, `no-map`, RPM message-RAM and hwlock references |
+| `memory@86400000` | `0x86400000` | 4 MiB | `0x86800000` | unnamed, `no-map` |
+
+The three candidate intervals are contiguous and their combined span is exactly 37 MiB. This confirms the candidate-side arithmetic, not stock semantic equivalence.
+
+### Blocking semantic/schema defect
+
+The candidate places `compatible = "qcom,smem"` on `/reserved-memory/memory@86300000`. The schema output from the same run reports:
+- `memory-region` is required for the SMEM device binding;
+- the candidate SMEM node's `reg` and `no-map` properties do not match that binding's allowed pattern.
+
+The stock audit instead records the SMEM device at `/soc/qcom,smem@86300000`. This points to a structural modeling error: the SMEM controller/device node and its backing reserved-memory region must be represented according to the pinned 5.15 binding, with a valid `memory-region` phandle. Do not merely suppress the schema diagnostic or move properties by guesswork.
+
+The 4 MiB candidate reservation at `0x86400000` has no compatible/label in the parsed DTB. Its stock consumer and ownership remain unknown. The candidate QSEE fixed reservation may also be semantically different from stock's QSEECom/secure dynamic or reusable pools.
+
+Required proof before any DTS change:
+1. Extract the exact raw stock FDT properties for `/reserved-memory/other_ext_region@0` and `/soc/qcom,smem@86300000`, including compatible, reg, address/size cells, ranges, no-map/reusable, hwlock, RPM message-RAM references and all phandles.
+2. Enumerate stock `memory-region` and `memory-region-names` consumers for QSEE/QSEECom, secure shared memory, SMEM, ADSP, GPU, Venus and other pools; resolve each phandle.
+3. Inspect the exact candidate DTS source corresponding to commit `372a9ae6591f15b691f68cdbd2e6971f2d91c108` and compare it with the compiled PVT1 DTB; preserve this artifact hash as the binary reference.
+4. Identify the intended consumer of the candidate 4 MiB node and prove whether it is a separate pool, suballocation or invalid placeholder.
+5. Trace ACK 5.15 QSEE/SCM, SMEM, RPM/SMD and remoteproc consumers, including hwlock and RPM message RAM contracts.
 6. Confirm DRAM bounds and all reservations from the actual C100 stock FDT/boot handoff; do not infer RAM size from the zero-filled root memory reg placeholder.
-7. Run an interval checker over the complete normalized inventory, modelling parent envelopes and subregions explicitly.
-
+7. Rebuild after any isolated correction; require clean relevant schema validation, phandle checks and interval checks before considering this subsystem accepted.
 ## 3. Remote firmware memory ranges
 
 | Consumer candidate | Start | Size | End | Current evidence |
@@ -100,7 +118,7 @@ Current donor-to-5.15 audit explicitly says the 4.19 Deen board disables modem, 
 
 | Item | Current evidence | Missing proof / disposition |
 |---|---|---|
-| SMEM physical region | Candidate description has `0x86300000/0x00100000`; stock FDT contains an SMEM device node at this address | Confirm stock node's exact compatible, properties, hwlock, RPM message RAM reference and memory ownership |
+| SMEM node/region model | Candidate DTB has `qcom,smem` at `/reserved-memory/memory@86300000` with 1 MiB `reg`, `no-map`, RPM message-RAM and hwlock references; stock audit records device node `/soc/qcom,smem@86300000` | Schema rejects candidate layout (`memory-region` required; `reg`/`no-map` mismatch); rebuild correct device-node + backing-region relationship from stock evidence |
 | RPM message RAM | Candidate MSM8953 SoC DTS has `rpm_msg_ram` at SoC offset `0x60000`, size `0x8000` | Match stock FDT resource and ACK 5.15 RPM/SMD consumer |
 | RPM SMD edge | Candidate description records RPM SMD edge 15 and `rpm_requests` channel | Verify stock edge/channel and RPM driver contract |
 | SMSM | Candidate description contains AP-side SMSM node and IPC tuples | Compare stock host/remote state layout and interrupt routing |
@@ -126,7 +144,7 @@ SMEM IDs above are donor/audit evidence, not a statement that every item is pres
 |---|---|
 | Stock Boot B / C100 FDT identity and hashes | PASS (read-only audit) |
 | Fixed interval arithmetic in this ledger | PASS |
-| QSEE/SMEM address adjacency | OBSERVED (arithmetic only; no ownership conclusion) |
+| Candidate QSEE/SMEM/unnamed 4 MiB arithmetic | PASS (candidate DTB parsed; stock equivalence HOLD) |
 | other_ext/QSEE/SMEM semantic ownership | HOLD |
 | 4 MiB interval consumer identification | OPEN |
 | Modem/ADSP/WCNSS firmware and memory-region mapping | HOLD |
@@ -138,6 +156,6 @@ SMEM IDs above are donor/audit evidence, not a statement that every item is pres
 
 ## Final decision
 
-The address arithmetic establishes only that the candidate 32 MiB QSEE interval ends at the stock SMEM node's unit address. It does not establish a 32+1+4 MiB partition of stock other_ext_region. The memory/SMEM implementation remains blocked on exact stock node properties, candidate source provenance, QSEE/SMEM consumers, the unexplained candidate entry at 0x86400000, the full reservation inventory, and the remoteproc/IPC resource graph.
+The candidate DTB artifact confirms a 32+1+4 MiB contiguous arithmetic partition, but the candidate SMEM node violates the pinned binding shape and stock's SMEM device is represented separately under `/soc`. The 4 MiB candidate node is unnamed. Therefore this arithmetic is not evidence of a valid stock-equivalent partition. Memory/SMEM remains blocked on exact stock node properties/phandles, a corrected SMEM device-to-region relationship, QSEE/SMEM consumers, the 4 MiB node's purpose, the full reservation inventory, and the remoteproc/IPC graph.
 
 No DTS or driver code was changed by this work. No boot image was generated and no device partition was written.
