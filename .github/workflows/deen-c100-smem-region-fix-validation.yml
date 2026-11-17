@@ -1,0 +1,161 @@
+name: Deen C100 SMEM region-fix validation
+
+on:
+  push:
+    paths:
+      - 'bootstrap/DEEN_C100_SMEM_REGION_FIX_VALIDATION'
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: Experimental source branch
+        required: true
+        default: deen/c100-smem-memory-region-fix
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deen-c100-smem-region-fix-validation
+  cancel-in-progress: false
+
+jobs:
+  validate-smem-fix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout control repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Install build and schema tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc bison build-essential flex gcc-aarch64-linux-gnu libelf-dev libssl-dev device-tree-compiler python3 python3-venv
+
+      - name: Fetch exact experimental source branch
+        id: source
+        env:
+          SOURCE_BRANCH: ${{ inputs.source_branch || 'deen/c100-smem-memory-region-fix' }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "+refs/heads/$SOURCE_BRANCH:refs/remotes/origin/smem-fix-source"
+          git worktree add --detach "$RUNNER_TEMP/deen-src" refs/remotes/origin/smem-fix-source
+          echo "source_branch=$SOURCE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$(git -C "$RUNNER_TEMP/deen-src" rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Assert SMEM source model
+        run: |
+          set -euo pipefail
+          DTS="$RUNNER_TEMP/deen-src/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-common.dtsi"
+          grep -Fq '/delete-property/ compatible;' "$DTS"
+          grep -Fq 'smem {' "$DTS"
+          grep -Fq 'compatible = "qcom,smem";' "$DTS"
+          grep -Fq 'memory-region = <&smem_mem>;' "$DTS"
+          grep -Fq 'qcom,rpm-msg-ram = <&rpm_msg_ram>;' "$DTS"
+          grep -Fq 'hwlocks = <&tcsr_mutex 3>;' "$DTS"
+
+      - name: Compile PVT1 and PVT2 DTBs
+        run: |
+          set -euo pipefail
+          SRC="$RUNNER_TEMP/deen-src"
+          OUT="$RUNNER_TEMP/deen-out"
+          mkdir -p "$OUT"
+          make -C "$SRC" O="$OUT" ARCH=arm64 defconfig
+          make -C "$SRC" O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb
+          PVT1="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          PVT2="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+          test -s "$PVT1"
+          test -s "$PVT2"
+          test "$(fdtget -t x "$PVT1" / qcom,board-id | tr '[:upper:]' '[:lower:]')" = "4d c100"
+          test "$(fdtget -t x "$PVT2" / qcom,board-id | tr '[:upper:]' '[:lower:]')" = "4d c200"
+
+      - name: Verify SMEM device-to-reservation phandle in compiled PVT1
+        run: |
+          set -euo pipefail
+          PVT1="$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          DEVICE_REGION="$(fdtget -t x "$PVT1" /smem memory-region)"
+          RESERVED_PHANDLE="$(fdtget -t x "$PVT1" /reserved-memory/memory@86300000 phandle)"
+          test "$DEVICE_REGION" = "$RESERVED_PHANDLE"
+          test "$(fdtget "$PVT1" /smem compatible)" = "qcom,smem"
+          fdtget -p "$PVT1" /reserved-memory/memory@86300000 | grep -Fxq no-map
+          if fdtget -p "$PVT1" /reserved-memory/memory@86300000 | grep -Eq '^(compatible|qcom,rpm-msg-ram|hwlocks)$'; then
+            echo "::error::SMEM device properties still attached to reserved-memory node"
+            exit 1
+          fi
+          fdtget -p "$PVT1" /smem | tee "$RUNNER_TEMP/smem-device-properties.txt"
+          echo "SMEM memory-region phandle resolves to the reserved-memory node: $DEVICE_REGION"
+
+      - name: Run pinned schema diagnostics for both variants
+        id: schema
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/dtschema-venv"
+          "$RUNNER_TEMP/dtschema-venv/bin/pip" install "dtschema==2024.2"
+          SRC="$RUNNER_TEMP/deen-src"
+          OUT="$RUNNER_TEMP/deen-out"
+          BIN="$RUNNER_TEMP/dtschema-venv/bin"
+          "$BIN/dt-doc-validate" "$SRC/Documentation/devicetree/bindings/arm/qcom.yaml"
+          "$BIN/dt-mk-schema" -j "$SRC/Documentation/devicetree/bindings" > "$RUNNER_TEMP/schema.json"
+          : > "$RUNNER_TEMP/schema-diagnostics.log"
+          for V in PVT1 PVT2; do
+            DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-${V,,}.dtb"
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/schema.json" "$DTB" > "$RUNNER_TEMP/$V-schema.log" 2>&1
+            STATUS=$?
+            set -e
+            echo "===== $V exit=$STATUS =====" >> "$RUNNER_TEMP/schema-diagnostics.log"
+            cat "$RUNNER_TEMP/$V-schema.log" >> "$RUNNER_TEMP/schema-diagnostics.log"
+          done
+          if grep -E 'memory@86300000:|qcom,smem.yaml' "$RUNNER_TEMP/schema-diagnostics.log"; then
+            echo "::error::SMEM binding diagnostics remain"
+            exit 1
+          fi
+          echo "Other diagnostics, if any, remain visible and do not become a schema PASS."
+
+      - name: Create evidence report
+        if: always()
+        env:
+          SOURCE_BRANCH: ${{ steps.source.outputs.source_branch }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          BUILD_OUTCOME: ${{ steps.compile.outcome }}
+          SCHEMA_OUTCOME: ${{ steps.schema.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo "# Deen C100 SMEM region-fix validation"
+            echo
+            echo "- Source branch: $SOURCE_BRANCH"
+            echo "- Source commit: $SOURCE_SHA"
+            echo "- DTB compile: ${BUILD_OUTCOME:-not-run}"
+            echo "- Schema/SMEM gate: ${SCHEMA_OUTCOME:-not-run}"
+            echo "- Scope: SMEM device-to-reserved-memory structure and PVT1/PVT2 identity only."
+            echo "- No complete memory ownership, firmware/IPC equivalence, kernel Image, boot packaging or hardware boot is implied."
+            echo
+            if [[ -s "$RUNNER_TEMP/smem-device-properties.txt" ]]; then cat "$RUNNER_TEMP/smem-device-properties.txt"; fi
+            if [[ -s "$RUNNER_TEMP/schema-diagnostics.log" ]]; then tail -n 160 "$RUNNER_TEMP/schema-diagnostics.log"; fi
+            find "$RUNNER_TEMP/deen-out/arch/arm64/boot/dts/qcom" -maxdepth 1 -name 'msm8953-motorola-deen-*.dtb' -exec sha256sum {} + 2>/dev/null || true
+          } > "$RUNNER_TEMP/SMEM_REGION_FIX_VALIDATION.md"
+          cat "$RUNNER_TEMP/SMEM_REGION_FIX_VALIDATION.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload SMEM validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-smem-region-fix-validation
+          path: |
+            ${{ runner.temp }}/SMEM_REGION_FIX_VALIDATION.md
+            ${{ runner.temp }}/smem-device-properties.txt
+            ${{ runner.temp }}/schema-diagnostics.log
+            ${{ runner.temp }}/PVT1-schema.log
+            ${{ runner.temp }}/PVT2-schema.log
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
+          if-no-files-found: warn
+          retention-days: 14
