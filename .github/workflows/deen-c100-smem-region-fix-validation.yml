@@ -160,3 +160,15 @@ jobs:
             ${{ runner.temp }}/deen-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Enforce SMEM-specific schema gate
+        if: always()
+        run: |
+          if [[ "${{ steps.compile.outcome }}" != "success" ]]; then
+            echo "::error::DTB compile gate did not pass"
+            exit 1
+          fi
+          if [[ "${{ steps.schema.outcome }}" != "success" ]]; then
+            echo "::error::SMEM-specific schema gate did not pass"
+            exit 1
+          fi
