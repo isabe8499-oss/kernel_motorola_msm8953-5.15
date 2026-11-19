@@ -70,15 +70,8 @@ jobs:
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
             2>&1 | tee "$LOG/old-smsm.log"
           cp "$OUT/.config" "$LOG/smsm-only.config"
-          python3 scripts/deen_c100_smsm_only_host_gate.py \
-            --kernel-root "$GITHUB_WORKSPACE" \
-            --host5-config "$LOG/host5.config" \
-            --smsm-config "$LOG/smsm-only.config" \
-            --fragment arch/arm64/configs/deen-msm8953-smsm-only-host.fragment \
-            --pvt1-dtb /dev/null --pvt2-dtb /dev/null \
-            --output "$LOG/config-preliminary.json" || true
-          # The final gate with real DTBs below is required; this invocation
-          # above is diagnostic-only to expose Kconfig independently.
+          # Final contract gate runs only with both real compiled candidate DTBs.
+          # No diagnostic failure is suppressed in the acceptance path.
 
       - name: Compile SMEM, SMD/RPM, SMSM and RPMCC objects plus both PVT DTBs
         run: |
