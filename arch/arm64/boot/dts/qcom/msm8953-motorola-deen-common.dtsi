@@ -87,6 +87,16 @@
 	status = "okay";
 };
 
+/*
+ * ACK 5.15 rpmpd.c obtains its RPM handle from the parent SMD device;
+ * it does not request a clock from this node. Drop the inherited, unused
+ * XO clock reference for Deen only and leave msm8953.dtsi unchanged.
+ */
+&rpmpd {
+	/delete-property/ clocks;
+	/delete-property/ clock-names;
+};
+
 &rpm_requests {
 	regulators {
 		compatible = "qcom,rpm-pm8953-regulators";
