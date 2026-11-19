@@ -1,0 +1,129 @@
+name: Deen C100 RPM DTB scoped schema gate (no boot or flash)
+
+on:
+  push:
+    branches:
+      - fix/deen-c100-rpm-dtb-schema-20261119
+  pull_request:
+    branches:
+      - audit/deen-c100-rpm-smem-gates-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rpm-schema-scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout immutable proposed kernel revision
+        uses: actions/checkout@v4
+
+      - name: Install ARM64 host tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler binutils-aarch64-linux-gnu \
+            python3 python3-venv
+
+      - name: Record revision and check narrow binding/DT changes
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-rpm-schema"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/deen-rpm-schema/source-sha.txt"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_c100_rpm_schema_gate.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm-schema/new-unit-tests.log"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_c100_rpm_of_match.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm-schema/previous-rpm-tests.log"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_c100_ipc_contract_audit.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm-schema/previous-audit-tests.log"
+
+      - name: Cross-compile PVT1/PVT2 DTBs and RPM/RPMPD objects, no boot image
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-rpm-schema-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          grep -qx 'CONFIG_QCOM_SMD_RPM=y' "$OUT/.config"
+          grep -qx 'CONFIG_QCOM_RPMPD=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm-schema/build.log"
+          test -s "$OUT/drivers/soc/qcom/smd-rpm.o"
+          test -s "$OUT/drivers/soc/qcom/rpmpd.o"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+          aarch64-linux-gnu-readelf -h "$OUT/drivers/soc/qcom/rpmpd.o" \
+            > "$RUNNER_TEMP/deen-rpm-schema/rpmpd-elf.txt"
+          grep -q 'AArch64' "$RUNNER_TEMP/deen-rpm-schema/rpmpd-elf.txt"
+
+      - name: Validate both bindings and compile the full pinned schema set
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/deen-rpm-schema/venv"
+          "$RUNNER_TEMP/deen-rpm-schema/venv/bin/pip" install 'dtschema==2024.2'
+          BIN="$RUNNER_TEMP/deen-rpm-schema/venv/bin"
+          "$BIN/dt-doc-validate" \
+            Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.yaml \
+            Documentation/devicetree/bindings/power/qcom,rpmpd.yaml \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm-schema/binding-validation.log"
+          "$BIN/dt-mk-schema" -j Documentation/devicetree/bindings \
+            > "$RUNNER_TEMP/deen-rpm-schema/full-dtschema.json"
+
+      - name: Validate entire PVT1 and PVT2 DTBs and preserve ALL remaining errors
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/deen-rpm-schema/venv/bin"
+          DTBS="$RUNNER_TEMP/deen-rpm-schema-out/arch/arm64/boot/dts/qcom"
+          for BOARD in pvt1 pvt2; do
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/deen-rpm-schema/full-dtschema.json" \
+              "$DTBS/msm8953-motorola-deen-$BOARD.dtb" \
+              > "$RUNNER_TEMP/deen-rpm-schema/$BOARD-schema.log" 2>&1
+            RC=$?
+            set -e
+            echo "$BOARD dt-validate exit=$RC (not interpreted as global schema PASS)"
+          done
+          python3 scripts/deen_c100_rpm_schema_gate.py \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-schema-log "$RUNNER_TEMP/deen-rpm-schema/pvt1-schema.log" \
+            --pvt2-schema-log "$RUNNER_TEMP/deen-rpm-schema/pvt2-schema.log" \
+            --output "$RUNNER_TEMP/deen-rpm-schema/rpm-schema-scope-report.json"
+          sha256sum "$DTBS"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            "$RUNNER_TEMP/deen-rpm-schema-out/drivers/soc/qcom/"{smd-rpm,rpmpd}.o \
+            > "$RUNNER_TEMP/deen-rpm-schema/binary-sha256.txt"
+
+      - name: Archive only host validation logs, DTBs and objects
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-rpm-dtb-schema-scope
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-rpm-schema/source-sha.txt
+            ${{ runner.temp }}/deen-rpm-schema/new-unit-tests.log
+            ${{ runner.temp }}/deen-rpm-schema/previous-rpm-tests.log
+            ${{ runner.temp }}/deen-rpm-schema/previous-audit-tests.log
+            ${{ runner.temp }}/deen-rpm-schema/build.log
+            ${{ runner.temp }}/deen-rpm-schema/binding-validation.log
+            ${{ runner.temp }}/deen-rpm-schema/pvt1-schema.log
+            ${{ runner.temp }}/deen-rpm-schema/pvt2-schema.log
+            ${{ runner.temp }}/deen-rpm-schema/rpm-schema-scope-report.json
+            ${{ runner.temp }}/deen-rpm-schema/binary-sha256.txt
+            ${{ runner.temp }}/deen-rpm-schema/rpmpd-elf.txt
+            ${{ runner.temp }}/deen-rpm-schema-out/.config
+            ${{ runner.temp }}/deen-rpm-schema-out/drivers/soc/qcom/smd-rpm.o
+            ${{ runner.temp }}/deen-rpm-schema-out/drivers/soc/qcom/rpmpd.o
+            ${{ runner.temp }}/deen-rpm-schema-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-rpm-schema-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
