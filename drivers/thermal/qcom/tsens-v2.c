@@ -109,7 +109,9 @@ struct tsens_plat_data data_tsens_v2 = {
  * The callback table, features and calibration are intentionally NOT set:
  * thermal runtime, register programming and vendor EEPROM have not been
  * validated. In particular, DO NOT add this to tsens_table / OF match until
- * the safety gates are satisfied. No DTB or firmware change is needed here.
+ * the safety gates are satisfied: the existing DT says 16 sensors while this
+ * array has 15, and tsens_probe() copies hw_ids before checking .ops.
+ * No DTB or firmware change is needed here.
  */
 static unsigned int tsens_msm8953_stage_hw_ids[] = {
 	1, 2, 3, 4, 5, 6, 7, 8,
