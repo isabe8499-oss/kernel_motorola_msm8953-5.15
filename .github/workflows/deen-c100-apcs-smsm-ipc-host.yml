@@ -1,0 +1,250 @@
+name: Deen C100 APCS SMSM SMD legacy syscon IPC host-only audit
+
+on:
+  push:
+    branches:
+      - audit/deen-c100-apcs-smsm-ipc-20261119
+  pull_request:
+    branches:
+      - audit/deen-gki-smem-rpm-config-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deen-apcs-smsm-legacy-ipc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout proposed ACK 5.15 source
+        uses: actions/checkout@v4
+      - name: Checkout pinned 3.18 source for regression test only
+        uses: actions/checkout@v4
+        with:
+          repository: isabe8499-oss/kernel_motorola_msm8953
+          ref: 1f700e4c2e31c435358e7531dfc0c2e41e2a2684
+          path: vendor318
+          persist-credentials: false
+      - name: Install LLVM 18 and kernel host dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex make python3 python3-venv \
+            libssl-dev libelf-dev device-tree-compiler \
+            clang-18 llvm-18 lld-18 gcc-aarch64-linux-gnu
+          test -x /usr/lib/llvm-18/bin/clang
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+      - name: Run safety unit tests and prior regressions
+        run: |
+          set -euo pipefail
+          REPORT="$RUNNER_TEMP/deen-gki-audit"
+          mkdir -p "$REPORT"
+          git rev-parse HEAD > "$REPORT/source-revision.txt"
+          git -C vendor318 rev-parse HEAD > "$REPORT/donor-revision.txt"
+          grep -qx '1f700e4c2e31c435358e7531dfc0c2e41e2a2684' "$REPORT/donor-revision.txt"
+          for TEST in test_deen_c100_apcs_smsm_ipc_gate.py \
+                      test_deen_gki_smem_rpm_config_gate.py \
+                      test_deen_tsens_hw_id_count_guard.py \
+                      test_deen_msm8953_tsens_stage_only.py \
+                      test_deen_c100_tsens_type3_register_gate.py \
+                      test_deen_c100_tsens_type3_contract.py \
+                      test_deen_c100_spmi_schema_gate.py \
+                      test_deen_c100_rpm_schema_gate.py \
+                      test_deen_c100_rpm_of_match.py \
+                      test_deen_c100_ipc_contract_audit.py; do
+            python3 -m unittest discover -s scripts -p "$TEST" -v \
+              2>&1 | tee "$REPORT/$TEST.log"
+          done
+      - name: Resolve GKI, Deen minimal, and Deen host-only Kconfig in order
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/deen-gki-audit-out"
+          REPORT="$RUNNER_TEMP/deen-gki-audit"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig \
+            2>&1 | tee "$REPORT/gki-defconfig.log"
+          cp "$OUT/.config" "$REPORT/gki.config"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-base.fragment \
+            2>&1 | tee "$REPORT/minimal-merge.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$REPORT/minimal-olddefconfig.log"
+          cp "$OUT/.config" "$REPORT/deen-minimal.config"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-smem-rpm-host.fragment \
+            2>&1 | tee "$REPORT/host-merge.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$REPORT/host-olddefconfig.log"
+          cp "$OUT/.config" "$REPORT/deen-smem-rpm-host.config"
+          python3 scripts/deen_gki_smem_rpm_config_gate.py \
+            --gki-config "$REPORT/gki.config" \
+            --minimal-config "$REPORT/deen-minimal.config" \
+            --host-config "$REPORT/deen-smem-rpm-host.config" \
+            --base-fragment arch/arm64/configs/deen-msm8953-base.fragment \
+            --host-fragment arch/arm64/configs/deen-msm8953-smem-rpm-host.fragment \
+            --output "$REPORT/host-config-audit.json" \
+            2>&1 | tee "$REPORT/host-config-gate.log"
+      - name: Resolve optional APCS + SMSM two-symbol host stage
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/deen-gki-audit-out"
+          REPORT="$RUNNER_TEMP/deen-gki-audit"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-apcs-smsm-host.fragment \
+            2>&1 | tee "$REPORT/apcs-smsm-merge.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$REPORT/apcs-smsm-olddefconfig.log"
+          cp "$OUT/.config" "$REPORT/deen-apcs-smsm-host.config"
+      - name: Compile 15 Qualcomm controller objects and PVT DTBs, no Image
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/deen-gki-audit-out"
+          REPORT="$RUNNER_TEMP/deen-gki-audit"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
+            drivers/hwspinlock/hwspinlock_core.o \
+            drivers/hwspinlock/qcom_hwspinlock.o \
+            drivers/soc/qcom/smem.o \
+            drivers/rpmsg/qcom_smd.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
+            drivers/clk/qcom/clk-smd-rpm.o \
+            drivers/clk/qcom/gcc-msm8953.o \
+            drivers/pinctrl/qcom/pinctrl-msm8953.o \
+            drivers/spmi/spmi-pmic-arb.o \
+            drivers/regulator/qcom_smd-regulator.o \
+            drivers/regulator/qcom_spmi-regulator.o \
+            drivers/mmc/host/sdhci-msm.o \
+            drivers/mailbox/qcom-apcs-ipc-mailbox.o \
+            drivers/soc/qcom/smsm.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$REPORT/build.log"
+          for obj in \
+            drivers/hwspinlock/hwspinlock_core.o \
+            drivers/hwspinlock/qcom_hwspinlock.o \
+            drivers/soc/qcom/smem.o \
+            drivers/rpmsg/qcom_smd.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/soc/qcom/rpmpd.o \
+            drivers/clk/qcom/clk-smd-rpm.o \
+            drivers/clk/qcom/gcc-msm8953.o \
+            drivers/pinctrl/qcom/pinctrl-msm8953.o \
+            drivers/spmi/spmi-pmic-arb.o \
+            drivers/regulator/qcom_smd-regulator.o \
+            drivers/regulator/qcom_spmi-regulator.o \
+            drivers/mmc/host/sdhci-msm.o \
+            drivers/mailbox/qcom-apcs-ipc-mailbox.o \
+            drivers/soc/qcom/smsm.o; do
+            test -s "$OUT/$obj" || { echo "missing $obj"; exit 3; }
+            sha256sum "$OUT/$obj"
+          done > "$REPORT/compiled-object-sha256.txt"
+          DTBS="$OUT/arch/arm64/boot/dts/qcom"
+          sha256sum "$DTBS"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            > "$REPORT/dtb-sha256.txt"
+          python3 - "$DTBS" <<'PY'
+          import hashlib,pathlib,sys
+          root=pathlib.Path(sys.argv[1])
+          expected={
+              "pvt1":"fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
+              "pvt2":"9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05",
+          }
+          for board,sha in expected.items():
+              p=root/f"msm8953-motorola-deen-{board}.dtb"
+              actual=hashlib.sha256(p.read_bytes()).hexdigest()
+              print(board, actual)
+              assert actual==sha, "DTB unexpectedly changed"
+          PY
+      - name: Preserve all full DTB schema diagnostics and thermal HOLD
+        run: |
+          set -euo pipefail
+          REPORT="$RUNNER_TEMP/deen-gki-audit"
+          python3 -m venv "$REPORT/venv"
+          "$REPORT/venv/bin/pip" install 'dtschema==2024.2'
+          "$REPORT/venv/bin/dt-mk-schema" -j Documentation/devicetree/bindings \
+            > "$REPORT/all-schemas.json"
+          DTBS="$RUNNER_TEMP/deen-gki-audit-out/arch/arm64/boot/dts/qcom"
+          for board in pvt1 pvt2; do
+            set +e
+            "$REPORT/venv/bin/dt-validate" -s "$REPORT/all-schemas.json" \
+              "$DTBS/msm8953-motorola-deen-$board.dtb" \
+              > "$REPORT/$board-schema.log" 2>&1
+            rc=$?
+            set -e
+            echo "$board schema rc=$rc, global schema remains REVIEW_REQUIRED"
+          done
+          python3 scripts/deen_c100_tsens_type3_register_gate.py \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            --vendor-tsens "$GITHUB_WORKSPACE/vendor318/drivers/thermal/msm-tsens.c" \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-schema-log "$REPORT/pvt1-schema.log" \
+            --pvt2-schema-log "$REPORT/pvt2-schema.log" \
+            --output "$REPORT/tsens-dtb-hold-report.json" \
+            2>&1 | tee "$REPORT/tsens-dtb-gate.log"
+          python3 scripts/deen_c100_apcs_smsm_ipc_gate.py \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            --host5-config "$REPORT/deen-smem-rpm-host.config" \
+            --host7-config "$REPORT/deen-apcs-smsm-host.config" \
+            --fragment arch/arm64/configs/deen-msm8953-apcs-smsm-host.fragment \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-schema-log "$REPORT/pvt1-schema.log" \
+            --pvt2-schema-log "$REPORT/pvt2-schema.log" \
+            --output "$REPORT/apcs-smsm-ipc-report.json" \
+            2>&1 | tee "$REPORT/apcs-smsm-ipc-gate.log"
+          python3 - "$REPORT/apcs-smsm-ipc-report.json" <<'PY'
+          import json,sys
+          report=json.load(open(sys.argv[1]))
+          assert report["overall"] == "PASS_HOST_ONLY_WITH_RUNTIME_HOLD"
+          assert set(report["config"]["delta"]) == {"QCOM_APCS_IPC", "QCOM_SMSM"}
+          assert report["smem_ipc_rpm_runtime"] == "HOLD"
+          assert report["firmware_remoteproc"] == "HOLD"
+          assert report["full_kernel_boot_flash_merge"] == "HOLD"
+          for board in ("pvt1", "pvt2"):
+              assert report[board]["diagnostics_total"] == 11
+              assert len(report[board]["endpoints"]) == 3
+              assert report[board]["firmware_rpm_ipc_runtime"] == "HOLD"
+          PY
+      - name: Archive host configs, logs, DTBs only; not boot or flash images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-apcs-smsm-ipc-host-only
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-gki-audit/source-revision.txt
+            ${{ runner.temp }}/deen-gki-audit/donor-revision.txt
+            ${{ runner.temp }}/deen-gki-audit/test*.log
+            ${{ runner.temp }}/deen-gki-audit/gki-defconfig.log
+            ${{ runner.temp }}/deen-gki-audit/minimal-merge.log
+            ${{ runner.temp }}/deen-gki-audit/minimal-olddefconfig.log
+            ${{ runner.temp }}/deen-gki-audit/host-merge.log
+            ${{ runner.temp }}/deen-gki-audit/host-olddefconfig.log
+            ${{ runner.temp }}/deen-gki-audit/gki.config
+            ${{ runner.temp }}/deen-gki-audit/deen-minimal.config
+            ${{ runner.temp }}/deen-gki-audit/deen-smem-rpm-host.config
+            ${{ runner.temp }}/deen-gki-audit/host-config-audit.json
+            ${{ runner.temp }}/deen-gki-audit/host-config-gate.log
+            ${{ runner.temp }}/deen-gki-audit/apcs-smsm-merge.log
+            ${{ runner.temp }}/deen-gki-audit/apcs-smsm-olddefconfig.log
+            ${{ runner.temp }}/deen-gki-audit/deen-apcs-smsm-host.config
+            ${{ runner.temp }}/deen-gki-audit/apcs-smsm-ipc-report.json
+            ${{ runner.temp }}/deen-gki-audit/apcs-smsm-ipc-gate.log
+            ${{ runner.temp }}/deen-gki-audit/build.log
+            ${{ runner.temp }}/deen-gki-audit/compiled-object-sha256.txt
+            ${{ runner.temp }}/deen-gki-audit/dtb-sha256.txt
+            ${{ runner.temp }}/deen-gki-audit/pvt1-schema.log
+            ${{ runner.temp }}/deen-gki-audit/pvt2-schema.log
+            ${{ runner.temp }}/deen-gki-audit/tsens-dtb-hold-report.json
+            ${{ runner.temp }}/deen-gki-audit/tsens-dtb-gate.log
+            ${{ runner.temp }}/deen-gki-audit-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-gki-audit-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
