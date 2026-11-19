@@ -1125,6 +1125,15 @@ static int tsens_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
+	/*
+	 * A DT #qcom,sensors override may be larger than the platform's
+	 * hw_ids table. Reject it before copying those IDs into priv->sensor.
+	 */
+	if (data->hw_ids && num_sensors > data->num_sensors) {
+		dev_err(dev, "%s: sensor count exceeds hardware ID map\n", __func__);
+		return -EINVAL;
+	}
+
 	priv = devm_kzalloc(dev,
 			     struct_size(priv, sensor, num_sensors),
 			     GFP_KERNEL);
