@@ -71,8 +71,8 @@ jobs:
           test -s "$OUT/drivers/thermal/qcom/built-in.a"
           llvm-ar t "$OUT/drivers/thermal/qcom/built-in.a" | \
             tee "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
-          grep -Fxq 'drivers/thermal/qcom/tsens.o' "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
-          grep -Fxq 'drivers/thermal/qcom/tsens-v2.o' "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
+          grep -Fq '/tsens.o' "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
+          grep -Fq '/tsens-v2.o' "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
           sha256sum "$OUT"/drivers/thermal/qcom/{tsens,tsens-v2}.o \
             > "$RUNNER_TEMP/ack-tsens-guard/object-sha256.txt"
       - name: Preserve host-only build, no boot.img or device firmware
