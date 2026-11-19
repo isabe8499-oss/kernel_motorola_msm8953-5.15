@@ -27,6 +27,17 @@ A configuração é **incompleta de propósito**. Não se atribuiu `ops_generic_
 
 **Nota importante:** o DTS existente ainda contém `"qcom,msm8953-tsens", "qcom,tsens-v2"`. Logo o **caminho genérico v2 atual permanece exatamente como antes**; esta branch não ativa a nova tabela nem altera o comportamento de fallback herdado. Não confundir “nenhuma ativação nova” com “TSENS existente desabilitado”.
 
+## BLOQUEADOR P0 novo: `#qcom,sensors` pode ultrapassar o array de 15 IDs
+
+A implementação atual de `tsens_probe()` em `drivers/thermal/qcom/tsens.c` começa com `num_sensors = data->num_sensors`, mas em seguida executa `of_property_read_u32(np, "#qcom,sensors", &num_sensors)`. **O DTSI MSM8953 continua declarando 16 sensores.** Se a futura entrada OF selecionasse agora o novo descritor de 15 elementos, o loop `priv->sensor[i].hw_id = data->hw_ids[i]` iria acessar `hw_ids[15]` fora do array quando `i == 15`.
+
+Por isso a ausência de OF match não é só uma preferência: **é condição de segurança obrigatória.** O novo teste `test_dt_count_override_would_overrun_unbound_fifteen_id_table` confirma em fonte essa dependência e impede apresentar o descritor como funcional. Antes de qualquer binding futuro, será necessário:
+- reconciliar o DTB e a quantidade de sensores real com o FDT stock C100;
+- garantir que o número efetivamente usado pelo probe nunca excede o tamanho da tabela `hw_ids` (incluindo regressões para DTs antigos);
+- só então verificar callbacks/registradores, calibração, segurança térmica e IRQ reais.
+
+**Nenhum valor no DTSI, nenhuma linha do `tsens_probe()` e nenhuma configuração de hardware foram alterados para ocultar essa condição.**
+
 ## Por que não ligar o descritor nesta etapa?
 
 - O stock C100 documentado indica **15 sensores** (IDs de hardware 1 a 15, clientes 1–15, slopes 0xc80), enquanto o candidato 5.15 usa `#qcom,sensors = <16>`, com indexação default 0–15.
