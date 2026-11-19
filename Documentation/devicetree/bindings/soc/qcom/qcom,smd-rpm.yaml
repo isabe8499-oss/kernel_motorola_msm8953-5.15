@@ -51,6 +51,12 @@ properties:
     items:
       - const: rpm_requests
 
+# RPM SMD child devices populated by the parent RPM transport driver.
+# Each child's own binding checks its compatible and properties independently.
+patternProperties:
+  "^(rpmcc|power-controller|regulators)$":
+    type: object
+
 if:
   properties:
     compatible:
