@@ -1,0 +1,136 @@
+name: Deen C100 SMSM legacy syscon without APCS mailbox - host only
+
+on:
+  push:
+    branches:
+      - audit/deen-c100-smsm-no-apcs-mailbox-20261119
+  pull_request:
+    branches:
+      - audit/deen-gki-smem-rpm-config-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smsmonly-host-config-and-ipc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Checkout ACK 5.15 candidate source
+        uses: actions/checkout@v4
+
+      - name: Install compiler and kernel build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex make python3 libssl-dev libelf-dev \
+            clang-18 llvm-18 lld-18 gcc-aarch64-linux-gnu
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+
+      - name: Test SMSM-only constraint and source legacy syscon contract
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-smsm-only"
+          git rev-parse HEAD > "$RUNNER_TEMP/deen-smsm-only/head.txt"
+          python3 -m unittest discover -s scripts -p \
+            "test_deen_c100_smsm_only_host_gate.py" -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-smsm-only/tests.log"
+          python3 -m unittest discover -s scripts -p \
+            "test_deen_gki_smem_rpm_config_gate.py" -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-smsm-only/base-tests.log"
+
+      - name: Resolve GKI + Deen20 + host5 and isolate one SMSM symbol
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/deen-smsm-only-out"
+          LOG="$RUNNER_TEMP/deen-smsm-only"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig \
+            2>&1 | tee "$LOG/gki.log"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-base.fragment \
+            2>&1 | tee "$LOG/merge-base.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$LOG/old-base.log"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-smem-rpm-host.fragment \
+            2>&1 | tee "$LOG/merge-host5.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$LOG/old-host5.log"
+          cp "$OUT/.config" "$LOG/host5.config"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-smsm-only-host.fragment \
+            2>&1 | tee "$LOG/merge-smsm.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$LOG/old-smsm.log"
+          cp "$OUT/.config" "$LOG/smsm-only.config"
+          # Final contract gate runs only with both real compiled candidate DTBs.
+          # No diagnostic failure is suppressed in the acceptance path.
+
+      - name: Compile SMEM, SMD/RPM, SMSM and RPMCC objects plus both PVT DTBs
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/deen-smsm-only-out"
+          LOG="$RUNNER_TEMP/deen-smsm-only"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
+            drivers/soc/qcom/smem.o \
+            drivers/soc/qcom/smsm.o \
+            drivers/rpmsg/qcom_smd.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/clk/qcom/clk-smd-rpm.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$LOG/build.log"
+          for obj in \
+            drivers/soc/qcom/smem.o \
+            drivers/soc/qcom/smsm.o \
+            drivers/rpmsg/qcom_smd.o \
+            drivers/soc/qcom/smd-rpm.o \
+            drivers/clk/qcom/clk-smd-rpm.o; do
+            test -s "$OUT/$obj" || { echo "MISSING $obj"; exit 2; }
+            sha256sum "$OUT/$obj"
+          done > "$LOG/objects.sha256"
+          DT="$OUT/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_c100_smsm_only_host_gate.py \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            --host5-config "$LOG/host5.config" \
+            --smsm-config "$LOG/smsm-only.config" \
+            --fragment arch/arm64/configs/deen-msm8953-smsm-only-host.fragment \
+            --pvt1-dtb "$DT/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DT/msm8953-motorola-deen-pvt2.dtb" \
+            --output "$LOG/smsm-only-gate.json" \
+            2>&1 | tee "$LOG/smsm-only-gate.log"
+          python3 - "$LOG/smsm-only-gate.json" <<'PY'
+          import json,sys
+          report=json.load(open(sys.argv[1]))
+          assert report["gate"] == "PASS_HOST_ONLY_WITH_RUNTIME_HOLD"
+          assert report["config"]["delta"] == {"QCOM_SMSM": ["n","y"]}
+          assert report["smem_rpm_thermal_firmware_runtime"] == "HOLD"
+          assert report["full_deen_config_boot_flash"] == "HOLD"
+          for variant in ("pvt1","pvt2"):
+              assert report[variant]["legacy_ipc_triplets"] == 3
+              assert report[variant]["stock_fdt_equivalence"] == "NOT_TESTED"
+          PY
+
+      - name: Publish logs, resolved configs, candidate DTBs (not boot images)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-smsm-only-no-apcs-host-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-smsm-only/*.log
+            ${{ runner.temp }}/deen-smsm-only/*.txt
+            ${{ runner.temp }}/deen-smsm-only/*.json
+            ${{ runner.temp }}/deen-smsm-only/*.config
+            ${{ runner.temp }}/deen-smsm-only/*.sha256
+            ${{ runner.temp }}/deen-smsm-only-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-smsm-only-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
