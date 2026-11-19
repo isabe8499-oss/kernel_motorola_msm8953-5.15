@@ -1,0 +1,140 @@
+name: Deen C100 TSENS TYPE3 source/DTB contract audit (thermal HOLD)
+
+on:
+  push:
+    branches:
+      - audit/deen-c100-tsens-type3-contract-20261119
+  pull_request:
+    branches:
+      - fix/deen-c100-spmi-schema-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tsens-type3-host-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact audit revision
+        uses: actions/checkout@v4
+
+      - name: Install ARM64 tools and dt-schema prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler binutils-aarch64-linux-gnu \
+            python3 python3-venv
+
+      - name: Run source/temperature contract tests and regressions
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-tsens"
+          git rev-parse HEAD > "$RUNNER_TEMP/deen-tsens/source-sha.txt"
+          for TEST in test_deen_c100_tsens_type3_contract.py \
+                      test_deen_c100_spmi_schema_gate.py \
+                      test_deen_c100_rpm_schema_gate.py \
+                      test_deen_c100_rpm_of_match.py \
+                      test_deen_c100_ipc_contract_audit.py; do
+            python3 -m unittest discover -s scripts -p "$TEST" -v \
+              2>&1 | tee "$RUNNER_TEMP/deen-tsens/$TEST.log"
+          done
+
+      - name: Cross-compile existing thermal objects and PVT1/PVT2 DTBs
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-tsens-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          grep -qx 'CONFIG_QCOM_TSENS=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            drivers/thermal/qcom/tsens.o \
+            drivers/thermal/qcom/tsens-v2.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-tsens/build.log"
+          for OBJ in tsens.o tsens-v2.o; do
+            test -s "$OUT/drivers/thermal/qcom/$OBJ"
+            aarch64-linux-gnu-readelf -h "$OUT/drivers/thermal/qcom/$OBJ" \
+              > "$RUNNER_TEMP/deen-tsens/$OBJ.readelf.txt"
+            grep -q AArch64 "$RUNNER_TEMP/deen-tsens/$OBJ.readelf.txt"
+          done
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+
+      - name: Run full pinned dt-schema without suppressing TSENS diagnostics
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/deen-tsens/venv"
+          "$RUNNER_TEMP/deen-tsens/venv/bin/pip" install 'dtschema==2024.2'
+          BIN="$RUNNER_TEMP/deen-tsens/venv/bin"
+          "$BIN/dt-doc-validate" Documentation/devicetree/bindings/thermal/qcom-tsens.yaml \
+            > "$RUNNER_TEMP/deen-tsens/tsens-binding-schema.log" 2>&1
+          "$BIN/dt-mk-schema" -j Documentation/devicetree/bindings \
+            > "$RUNNER_TEMP/deen-tsens/full-dtschema.json"
+          DTBS="$RUNNER_TEMP/deen-tsens-out/arch/arm64/boot/dts/qcom"
+          for BOARD in pvt1 pvt2; do
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/deen-tsens/full-dtschema.json" \
+              "$DTBS/msm8953-motorola-deen-$BOARD.dtb" \
+              > "$RUNNER_TEMP/deen-tsens/$BOARD-schema.log" 2>&1
+            RC=$?
+            set -e
+            echo "$BOARD dt-validate exit=$RC; FULL DTB STILL REVIEW_REQUIRED"
+          done
+
+      - name: Assert exact stock-difference inventory and preserve TYPE3 HOLD
+        run: |
+          set -euo pipefail
+          DTBS="$RUNNER_TEMP/deen-tsens-out/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_c100_tsens_type3_contract.py \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-schema-log "$RUNNER_TEMP/deen-tsens/pvt1-schema.log" \
+            --pvt2-schema-log "$RUNNER_TEMP/deen-tsens/pvt2-schema.log" \
+            --output "$RUNNER_TEMP/deen-tsens/type3-contract.json" \
+            2>&1 | tee "$RUNNER_TEMP/deen-tsens/type3-contract-gate.log"
+          python3 - "$RUNNER_TEMP/deen-tsens/type3-contract.json" <<'PY'
+          import json,sys
+          v=json.load(open(sys.argv[1]))
+          assert v["overall"] == "PASS_HOST_AUDIT_ONLY_WITH_THERMAL_HOLD"
+          assert v["legacy_driver_port"] == "HOLD"
+          assert v["thermal_sensor_mapping"] == "HOLD_1_TO_15_VS_0_TO_15"
+          assert v["firmware_boot_flash_merge"] == "HOLD"
+          for board in ("pvt1", "pvt2"):
+              assert v[board]["diagnostics_count"] == 11
+              assert v[board]["hardware_thermal_runtime"] == "HOLD_TYPE3_NOT_VALIDATED"
+              assert v[board]["stock_binary_comparison"] == "NOT_DONE_STOCK_FDT_UNAVAILABLE"
+          PY
+          sha256sum "$DTBS"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            "$RUNNER_TEMP/deen-tsens-out/drivers/thermal/qcom/"{tsens,tsens-v2}.o \
+            > "$RUNNER_TEMP/deen-tsens/binary-sha256.txt"
+
+      - name: Archive host-only audits; no Image, boot or flash files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-tsens-type3-host-audit
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-tsens/source-sha.txt
+            ${{ runner.temp }}/deen-tsens/test*.log
+            ${{ runner.temp }}/deen-tsens/build.log
+            ${{ runner.temp }}/deen-tsens/tsens.o.readelf.txt
+            ${{ runner.temp }}/deen-tsens/tsens-v2.o.readelf.txt
+            ${{ runner.temp }}/deen-tsens/tsens-binding-schema.log
+            ${{ runner.temp }}/deen-tsens/pvt1-schema.log
+            ${{ runner.temp }}/deen-tsens/pvt2-schema.log
+            ${{ runner.temp }}/deen-tsens/type3-contract.json
+            ${{ runner.temp }}/deen-tsens/type3-contract-gate.log
+            ${{ runner.temp }}/deen-tsens/binary-sha256.txt
+            ${{ runner.temp }}/deen-tsens-out/.config
+            ${{ runner.temp }}/deen-tsens-out/drivers/thermal/qcom/tsens.o
+            ${{ runner.temp }}/deen-tsens-out/drivers/thermal/qcom/tsens-v2.o
+            ${{ runner.temp }}/deen-tsens-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-tsens-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
