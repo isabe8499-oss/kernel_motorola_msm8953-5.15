@@ -21,7 +21,7 @@ struct tsens_plat_data data_msm8953_stage_only = {
 
 O `struct tsens_plat_data` existe em `drivers/thermal/qcom/tsens.h` e o `tsens_probe()` no arquivo `tsens.c` usa `data->hw_ids[i]` quando a tabela é disponibilizada. A tabela numérica 1–15 vem da **auditoria anterior do FDT stock C100**, não de uma leitura direta do binário original nesta etapa.
 
-A configuração é **incompleta de propósito**. Não se atribuiu `ops_generic_v2`, versão de IP, conversão térmica, EEPROM, calibração, limites, interrupções ou dados de registradores ao novo descriptor porque essas peças ainda não foram comprovadas em runtime. Se fosse ligado hoje, `tsens_probe()` abortaria em `if (!priv->ops || !priv->ops->init || !priv->ops->get_temp) return -EINVAL;`. A branch não faz essa ligação.
+A configuração é **incompleta de propósito**. Não se atribuiu `ops_generic_v2`, versão de IP, conversão térmica, EEPROM, calibração, limites, interrupções ou dados de registradores ao novo descriptor porque essas peças ainda não foram comprovadas em runtime. O `tsens_probe()` possui a validação `if (!priv->ops || !priv->ops->init || !priv->ops->get_temp) return -EINVAL;`, **mas ela ocorre depois de copiar os `hw_ids`**. Como o DT atual declara 16 sensores, uma ligação prematura **poderia ler fora do array antes de chegar a essa validação**. A branch não faz essa ligação.
 
 **Não foram alterados:** `drivers/thermal/qcom/tsens.c` (inclusive `tsens_table`), `tsens.h`, `msm8953.dtsi`, DTBs, `qcom-tsens.yaml`, `Makefile`, `Kconfig`, funções de acesso MMIO, reguladores ou firmware.
 
