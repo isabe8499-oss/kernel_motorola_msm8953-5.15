@@ -1,0 +1,288 @@
+{
+  "provenance": {
+    "source": "user-provided Deen_Boot_B_Audit.zip -> Deen_Boot_B_Audit/boot_b-original.img, read only",
+    "boot_size": 67108864,
+    "boot_sha256": "6e8ec0eafec86e50b8895f81fc1c4809f0c1e0c674ea82a8640e7a3ace7a9765",
+    "dto_size": 16777216,
+    "dto_sha256": "080acf35a507ac9849cfcba47dc2ad83e01b75663a516279c8b9d243b719643e",
+    "fdt_count": 7,
+    "scan_date": "2026-11-19",
+    "raw_stock_in_repo": false
+  },
+  "stock": {
+    "c100": {
+      "board": [
+        77,
+        49408
+      ],
+      "msm": [
+        293,
+        0
+      ],
+      "offset": 12026378,
+      "size": 253704,
+      "nodes": 1471,
+      "sha256": "537dc8c3f0a75fbe0b27d8d32b067c7efa8472dccd86b33698700e7e4022408a"
+    },
+    "c200": {
+      "board": [
+        77,
+        49664
+      ],
+      "msm": [
+        293,
+        0
+      ],
+      "offset": 11265270,
+      "size": 253704,
+      "nodes": 1471,
+      "sha256": "f1bd9bb41f203ebb443b79bfd38564e6203fb858be3d53d8ad132792952c9a16"
+    },
+    "smem": {
+      "node": "/soc/qcom,smem@86300000",
+      "reg_names": [
+        "smem",
+        "irq-reg-base",
+        "aux-mem1",
+        "smem_targ_info_reg"
+      ],
+      "reg_pairs": [
+        [
+          2251292672,
+          1048576
+        ],
+        [
+          184619016,
+          4
+        ],
+        [
+          393216,
+          32768
+        ],
+        [
+          26464256,
+          8
+        ]
+      ],
+      "irq_reg_mmio": 184619016,
+      "mpu_enabled": true
+    },
+    "block_at_b011000": {
+      "node": "/soc/clock-controller@b011000",
+      "compatible": [
+        "qcom,8953-l2ccc"
+      ],
+      "reg_pair": [
+        184619008,
+        4096
+      ]
+    },
+    "endpoints": {
+      "smd-rpm": {
+        "edge": 15,
+        "spi": 168,
+        "offset": 0,
+        "mask": 1,
+        "bit": 0
+      },
+      "smd-modem": {
+        "edge": 0,
+        "spi": 25,
+        "offset": 0,
+        "mask": 4096,
+        "bit": 12
+      },
+      "smsm-modem": {
+        "edge": 0,
+        "spi": 26,
+        "offset": 0,
+        "mask": 8192,
+        "bit": 13
+      },
+      "smd-wcnss": {
+        "edge": 6,
+        "spi": 142,
+        "offset": 0,
+        "mask": 131072,
+        "bit": 17
+      },
+      "smsm-wcnss": {
+        "edge": 6,
+        "spi": 144,
+        "offset": 0,
+        "mask": 524288,
+        "bit": 19
+      },
+      "smd-adsp": {
+        "edge": 1,
+        "spi": 289,
+        "offset": 0,
+        "mask": 256,
+        "bit": 8
+      },
+      "smsm-adsp": {
+        "edge": 1,
+        "spi": 290,
+        "offset": 0,
+        "mask": 512,
+        "bit": 9
+      }
+    },
+    "no_qcom_ipc_triples": true,
+    "tsens": {
+      "node": "/soc/tsens@4a8000",
+      "compatible": [
+        "qcom,msm8953-tsens"
+      ],
+      "count": 15,
+      "ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "reg_pairs": [
+        [
+          4882432,
+          8192
+        ],
+        [
+          671744,
+          4096
+        ]
+      ],
+      "irq_spis": [
+        184,
+        314
+      ],
+      "slope_count": 15,
+      "slope_each": 3200
+    },
+    "spmi": {
+      "reg_names": [
+        "core",
+        "chnls",
+        "obsrvr",
+        "intr",
+        "cnfg"
+      ],
+      "reg_pairs": [
+        [
+          33615872,
+          4096
+        ],
+        [
+          37748736,
+          8388608
+        ],
+        [
+          46137344,
+          8388608
+        ],
+        [
+          58720256,
+          2097152
+        ],
+        [
+          33595392,
+          8448
+        ]
+      ]
+    },
+    "c100_c200_property_diff_only": [
+      "/",
+      "qcom,board-id"
+    ]
+  },
+  "candidate": {
+    "pvt1": {
+      "board": [
+        77,
+        49408
+      ],
+      "sha256": "fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
+      "nodes": 249
+    },
+    "pvt2": {
+      "board": [
+        77,
+        49664
+      ],
+      "sha256": "9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05",
+      "nodes": 249
+    },
+    "apcs": {
+      "node": "/soc@0/mailbox@b011000",
+      "compatible": [
+        "qcom,msm8953-apcs-kpss-global",
+        "syscon"
+      ],
+      "reg_pair": [
+        184619008,
+        4096
+      ]
+    },
+    "ipc": {
+      "smd-rpm": [
+        "/smd/rpm",
+        "qcom,ipc",
+        8,
+        0
+      ],
+      "smsm-modem-bit": [
+        "/smsm",
+        "qcom,ipc-1",
+        8,
+        13
+      ],
+      "smsm-wcnss-bit": [
+        "/smsm",
+        "qcom,ipc-3",
+        8,
+        19
+      ]
+    },
+    "smem": {
+      "node": "/smem",
+      "memory_region_pair": [
+        2251292672,
+        1048576
+      ]
+    },
+    "tsens": {
+      "node": "/soc@0/thermal-sensor@4a9000",
+      "compatible": [
+        "qcom,msm8953-tsens",
+        "qcom,tsens-v2"
+      ],
+      "count": 16,
+      "reg_pairs": [
+        [
+          4886528,
+          4096
+        ],
+        [
+          4882432,
+          4096
+        ]
+      ]
+    },
+    "spmi_equal_stock_five_ranges": true
+  },
+  "limits": [
+    "This manifest was derived from the user's raw stock boot image in a read-only local scan; the binary image and extracted raw FDTs are NOT committed.",
+    "CI can test candidate DTBs against this derived manifest; it CANNOT reverify the original stock bytes without separately supplied stock boot.",
+    "Three matching physical MMIO bit positions do not establish host identity, IPC ABI, IRQ delivery, firmware response, thermal runtime, boot compatibility, or flash readiness."
+  ]
+}
