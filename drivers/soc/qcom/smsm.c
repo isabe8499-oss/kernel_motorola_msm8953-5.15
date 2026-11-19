@@ -522,6 +522,14 @@ static int qcom_smsm_probe(struct platform_device *pdev)
 			     "qcom,local-host",
 			     &smsm->local_host);
 
+	/* The local host indexes both the state array and subscription matrix. */
+	if (smsm->local_host >= smsm->num_entries ||
+	    smsm->local_host >= smsm->num_hosts) {
+		dev_err(&pdev->dev, "local host index exceeds SMSM dimensions\n");
+		ret = -EINVAL;
+		goto out_put;
+	}
+
 	/* Parse the host properties */
 	for (id = 0; id < smsm->num_hosts; id++) {
 		ret = smsm_parse_ipc(smsm, id);
