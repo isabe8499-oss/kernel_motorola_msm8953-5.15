@@ -66,3 +66,9 @@ Workflow `.github/workflows/deen-c100-spmi-schema-scope.yml`:
 - `TSENS_TYPE3`: HOLD (port do driver térmico é o próximo item substancial; criar plano específico antes de mexer em registradores).
 - `STOCK_SPMI_BINARY`: HOLD até a cópia previamente existente e verificável do FDT stock C100 estar disponível.
 - `BOOT/FLASH`, `FIRMWARE/REMOTEPROC`, `MEMORY_OWNERSHIP`, `MERGE`: HOLD.
+
+## 6. Primeira validação e correção de follow-up (CI, 19/11/2026)
+
+- [Run #44547121100](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/44547121100) **falhou corretamente no gate** após os testes host, compilação de `spmi-pmic-arb.o`, DTBs e validação YAML passarem. O diagnóstico `spmi@200f000: reg ... is too long` continuou presente nos dois DTBs, apesar da primeira tentativa de condicional. O teste negativo com SPMI genérico de duas regiões foi rejeitado e o controle genérico de uma região não recebeu erro SPMI, ambos como esperado.
+- Hipótese compatível com o comportamento observado: a normalização de `dtschema==2024.2` estabelece `reg.maxItems:1` quando não existe limite superior explícito na definição principal da propriedade. Para impedir que esta restrição global impeça o ramo Qualcomm, o binding agora declara `reg.minItems:1/maxItems:5` explicitamente e o ramo `else` restringe de volta `maxItems:1` todos os demais controladores.
+- **Esse follow-up exige nova validação** nos dois DTBs e nos dois controles antes de qualquer PASS; a hipótese não é prova até CI confirmar o efeito. O erro de CI anterior não foi escondido nem reclassificado como sucesso.
