@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# HOST-ONLY experiment, *not* a Deen production defconfig.
+# Apply after GKI + Deen20 + the five-symbol SMEM/SMD/RPM host fragment.
+# Neither the APCS mailbox path nor SMSM firmware behavior is proven at runtime.
+# Deen's SMD/RPM presently uses legacy qcom,ipc syscon, not mboxes.
+#
+CONFIG_QCOM_APCS_IPC=y
+CONFIG_QCOM_SMSM=y
