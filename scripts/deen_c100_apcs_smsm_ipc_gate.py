@@ -171,6 +171,11 @@ def config_audit(base_file, after_file, fragment):
     if set(delta) != set(NEW):
         errors.append(f"unexpected Kconfig changes outside APCS/SMSM: {sorted(delta)}")
     for name in NO_NEW_ENABLEMENT:
+        # The PR #13 guard bans SMSM, appropriately for its host5 scope.
+        # This stage explicitly permits only the two exact delta keys in NEW;
+        # all other originally forbidden subsystems remain blocked.
+        if name in NEW:
+            continue
         if before.get(name, "n") not in ("y", "m") and after.get(name, "n") in ("y", "m"):
             errors.append(f"forbidden new subsystem enablement: {name}")
     for name in ("LTO_CLANG_FULL", "CFI_CLANG"):
