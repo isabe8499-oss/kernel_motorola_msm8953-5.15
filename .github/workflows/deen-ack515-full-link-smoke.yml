@@ -66,11 +66,11 @@ jobs:
               echo "FORBIDDEN_ENABLEMENT: $opt"; exit 3
             fi
           done
-          # The first attempt completed thousands of CC/AR jobs but GitHub
-          # shut down the runner while Full LTO optimized vmlinux.o (143).
-          # PROBE ONLY: preserve host5.config and remove LTO/CFI in a
-          # TRANSIENT runner config to test source correctness and final link.
-          # This is NOT the hardened GKI configuration and NOT flashable.
+          # The original GKI host5 config remains saved. Full LTO in the first
+          # run was interrupted by runner shutdown (SIGTERM/exit 143).
+          # CI-only diagnostic: remove LTO/CFI in the TEMPORARY .config to
+          # find genuine compile/link errors without a high-RAM LTO stage.
+          # This is not the hardened GKI configuration or a flashable build.
           scripts/config --file "$OUT/.config" \
             -d LTO_CLANG_FULL -d LTO_CLANG_THIN -e LTO_NONE \
             -d CFI_CLANG -d CFI_CLANG_SHADOW
@@ -78,7 +78,35 @@ jobs:
             2>&1 | tee "$LOG/old-nolto-smoke.log"
           cp "$OUT/.config" "$LOG/nolto-smoke.config"
           grep -Fxq 'CONFIG_LTO_NONE=y' "$OUT/.config"
-          ! grep -Eq '^CONFIG_(LTO_CLANG_FULL|LTO_CLANG_THIN|CFI_CLANG)=y
+          if grep -Eq '^CONFIG_(LTO_CLANG_FULL|LTO_CLANG_THIN|CFI_CLANG)=y$' "$OUT/.config"; then
+            echo "FAIL_NOLTO_CFI_STILL_ENABLED"; exit 3
+          fi
+          python3 - "$LOG/host5.config" "$OUT/.config" "$LOG/nolto-delta.json" <<'PY'
+          import json, pathlib, sys
+          sys.path.insert(0, "scripts")
+          from deen_gki_smem_rpm_config_gate import read_config, MINIMAL, HOST_ONLY, NO_NEW_ENABLEMENT
+          before = read_config(pathlib.Path(sys.argv[1]))
+          after = read_config(pathlib.Path(sys.argv[2]))
+          for key in MINIMAL + HOST_ONLY:
+              assert before.get(key) == after.get(key) == "y", key
+          assert before.get("LTO_CLANG_FULL") == "y"
+          assert before.get("CFI_CLANG") == "y"
+          assert after.get("LTO_NONE") == "y"
+          assert after.get("CFI_CLANG", "n") == "n"
+          for key in NO_NEW_ENABLEMENT:
+              assert not (before.get(key, "n") not in ("y", "m") and after.get(key, "n") in ("y", "m")), key
+          delta = {key: [before.get(key, "n"), after.get(key, "n")]
+                   for key in sorted(set(before) | set(after))
+                   if before.get(key, "n") != after.get(key, "n")}
+          pathlib.Path(sys.argv[3]).write_text(json.dumps({
+              "gate": "HOST_LINK_DIAGNOSTIC_ONLY",
+              "hardened_gki_full_lto": False,
+              "saved_host5_hardened_config": True,
+              "delta": delta
+          }, indent=2) + "\n")
+          print("PASS_TRANSIENT_NOLTO_SCOPE", delta)
+          PY
+      - name: Build and link FULL ARM64 Image using Clang18 without LTO (host-only diagnostic)
         run: |
           set -euo pipefail
           export PATH="/usr/lib/llvm-18/bin:$PATH"
@@ -95,80 +123,6 @@ jobs:
           wc -c "$OUT/vmlinux" "$OUT/arch/arm64/boot/Image" \
             > "$LOG/full-image-sizes.txt"
           echo "PASS_NOLTO_LINK_ONLY_GKI_FULL_LTO_NOT_YET_VALIDATED" | tee "$LOG/full-image-gate.txt"
-      - name: Verify both PVT DTBs still match previously verified candidate hashes
-        run: |
-          set -euo pipefail
-          export PATH="/usr/lib/llvm-18/bin:$PATH"
-          OUT="$RUNNER_TEMP/ack-full-out"
-          LOG="$RUNNER_TEMP/ack-full-log"
-          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
-            qcom/msm8953-motorola-deen-pvt1.dtb \
-            qcom/msm8953-motorola-deen-pvt2.dtb \
-            2>&1 | tee "$LOG/dtb-build.log"
-          python3 - "$OUT/arch/arm64/boot/dts/qcom" "$LOG" <<'PY'
-          import hashlib,sys,pathlib
-          folder,log=map(pathlib.Path,sys.argv[1:])
-          expected={
-              "pvt1":"fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
-              "pvt2":"9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05"
-          }
-          for board,digest in expected.items():
-              raw=(folder/("msm8953-motorola-deen-"+board+".dtb")).read_bytes()
-              assert hashlib.sha256(raw).hexdigest()==digest,board
-          (log/"dtb-gate.txt").write_text("PASS_DTB_HASHES_UNCHANGED\n")
-          PY
-      - name: Publish logs and SHA only, never Image, vmlinux or stock boot
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: deen-ack515-full-link-host-only-logs
-          retention-days: 14
-          if-no-files-found: warn
-          path: |
-            ${{ runner.temp }}/ack-full-log/*.log
-            ${{ runner.temp }}/ack-full-log/*.json
-            ${{ runner.temp }}/ack-full-log/*.config
-            ${{ runner.temp }}/ack-full-log/*.txt
- "$OUT/.config"
-          python3 - "$LOG/host5.config" "$OUT/.config" "$LOG/nolto-delta.json" <<'PY'
-          import json, sys
-          sys.path.insert(0, "scripts")
-          from deen_gki_smem_rpm_config_gate import read_config, MINIMAL, HOST_ONLY, NO_NEW_ENABLEMENT
-          before, after = (read_config(__import__("pathlib").Path(p)) for p in sys.argv[1:3])
-          for key in MINIMAL + HOST_ONLY:
-              assert before.get(key) == after.get(key) == "y", key
-          assert before.get("LTO_CLANG_FULL") == "y" and before.get("CFI_CLANG") == "y"
-          assert after.get("LTO_NONE") == "y"
-          assert after.get("CFI_CLANG", "n") == "n"
-          for key in NO_NEW_ENABLEMENT:
-              assert not (before.get(key, "n") not in ("y","m") and after.get(key, "n") in ("y","m")), key
-          delta = {key: [before.get(key, "n"), after.get(key, "n")]
-                   for key in sorted(set(before)|set(after))
-                   if before.get(key, "n") != after.get(key, "n")}
-          with open(sys.argv[3], "w") as out:
-              json.dump({"gate":"HOST_LINK_EXPERIMENT_ONLY","hardened_gki_full_lto":False,
-                         "prior_hardened_config_saved":"host5.config",
-                         "newly_enabled_remoteproc_or_tsens":False,
-                         "delta":delta},out,indent=2)
-          print("PASS_TRANSIENT_NOLTO_SCOPE", delta)
-          PY
-      - name: Build and link FULL ARM64 Image using Clang18 without LTO (CI experiment)
-        run: |
-          set -euo pipefail
-          export PATH="/usr/lib/llvm-18/bin:$PATH"
-          OUT="$RUNNER_TEMP/ack-full-out"
-          LOG="$RUNNER_TEMP/ack-full-log"
-          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j4 Image \
-            2>&1 | tee "$LOG/full-image-build.log"
-          test -s "$OUT/vmlinux"
-          test -s "$OUT/arch/arm64/boot/Image"
-          llvm-readelf -h "$OUT/vmlinux" > "$LOG/vmlinux-elf.txt"
-          grep -Fq 'AArch64' "$LOG/vmlinux-elf.txt"
-          sha256sum "$OUT/vmlinux" "$OUT/arch/arm64/boot/Image" \
-            > "$LOG/full-image-sha256.txt"
-          wc -c "$OUT/vmlinux" "$OUT/arch/arm64/boot/Image" \
-            > "$LOG/full-image-sizes.txt"
-          echo "PASS_FULL_LINK_HOST_ONLY_NO_BOOT_PACKAGE" | tee "$LOG/full-image-gate.txt"
       - name: Verify both PVT DTBs still match previously verified candidate hashes
         run: |
           set -euo pipefail
