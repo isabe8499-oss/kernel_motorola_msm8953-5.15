@@ -1,0 +1,156 @@
+name: Deen C100 TSENS TYPE3 register and thermal-zone source gate
+
+on:
+  push:
+    branches:
+      - audit/deen-c100-tsens-register-irq-zones-20261119
+  pull_request:
+    branches:
+      - audit/deen-c100-tsens-type3-contract-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  type3-register-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Checkout exact proposed 5.15 audit source
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned public vendor Linux 3.18 donor read-only
+        uses: actions/checkout@v4
+        with:
+          repository: isabe8499-oss/kernel_motorola_msm8953
+          ref: 1f700e4c2e31c435358e7531dfc0c2e41e2a2684
+          path: vendor318
+          persist-credentials: false
+
+      - name: Install ARM64 cross-build and devicetree tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler binutils-aarch64-linux-gnu \
+            python3 python3-venv
+
+      - name: Pin both donor and ACK source revisions and run host tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-tsens-map"
+          git rev-parse HEAD > "$RUNNER_TEMP/deen-tsens-map/source-5.15-sha.txt"
+          git -C vendor318 rev-parse HEAD > "$RUNNER_TEMP/deen-tsens-map/donor-3.18-sha.txt"
+          grep -qx '1f700e4c2e31c435358e7531dfc0c2e41e2a2684' \
+            "$RUNNER_TEMP/deen-tsens-map/donor-3.18-sha.txt"
+          for TEST in test_deen_c100_tsens_type3_register_gate.py \
+                      test_deen_c100_tsens_type3_contract.py \
+                      test_deen_c100_spmi_schema_gate.py \
+                      test_deen_c100_rpm_schema_gate.py \
+                      test_deen_c100_rpm_of_match.py \
+                      test_deen_c100_ipc_contract_audit.py; do
+            python3 -m unittest discover -s scripts -p "$TEST" -v \
+              2>&1 | tee "$RUNNER_TEMP/deen-tsens-map/$TEST.log"
+          done
+
+      - name: Cross-compile 5.15 thermal objects and PVT1/PVT2 DTBs (no Image)
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-tsens-map-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          grep -qx 'CONFIG_QCOM_TSENS=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            drivers/thermal/qcom/tsens.o \
+            drivers/thermal/qcom/tsens-v2.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-tsens-map/build.log"
+          for OBJ in tsens.o tsens-v2.o; do
+            test -s "$OUT/drivers/thermal/qcom/$OBJ"
+            aarch64-linux-gnu-readelf -h "$OUT/drivers/thermal/qcom/$OBJ" \
+              > "$RUNNER_TEMP/deen-tsens-map/$OBJ.readelf.txt"
+            grep -q AArch64 "$RUNNER_TEMP/deen-tsens-map/$OBJ.readelf.txt"
+          done
+
+      - name: Compile pinned full schema and collect unfiltered PVT diagnostics
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/deen-tsens-map/venv"
+          "$RUNNER_TEMP/deen-tsens-map/venv/bin/pip" install 'dtschema==2024.2'
+          BIN="$RUNNER_TEMP/deen-tsens-map/venv/bin"
+          "$BIN/dt-doc-validate" Documentation/devicetree/bindings/thermal/qcom-tsens.yaml \
+            > "$RUNNER_TEMP/deen-tsens-map/tsens-binding-schema.log" 2>&1
+          "$BIN/dt-mk-schema" -j Documentation/devicetree/bindings \
+            > "$RUNNER_TEMP/deen-tsens-map/full-dtschema.json"
+          DTBS="$RUNNER_TEMP/deen-tsens-map-out/arch/arm64/boot/dts/qcom"
+          for BOARD in pvt1 pvt2; do
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/deen-tsens-map/full-dtschema.json" \
+              "$DTBS/msm8953-motorola-deen-$BOARD.dtb" \
+              > "$RUNNER_TEMP/deen-tsens-map/$BOARD-schema.log" 2>&1
+            RC=$?
+            set -e
+            echo "$BOARD dt-validate status=$RC; FULL SCHEMA REVIEW_REQUIRED"
+          done
+
+      - name: Require 11 register pairs, 15 IDs and 8 CPU zones on BOTH DTBs
+        run: |
+          set -euo pipefail
+          DTBS="$RUNNER_TEMP/deen-tsens-map-out/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_c100_tsens_type3_register_gate.py \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            --vendor-tsens "$GITHUB_WORKSPACE/vendor318/drivers/thermal/msm-tsens.c" \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-schema-log "$RUNNER_TEMP/deen-tsens-map/pvt1-schema.log" \
+            --pvt2-schema-log "$RUNNER_TEMP/deen-tsens-map/pvt2-schema.log" \
+            --output "$RUNNER_TEMP/deen-tsens-map/type3-register-zones.json" \
+            2>&1 | tee "$RUNNER_TEMP/deen-tsens-map/host-gate.log"
+          python3 - "$RUNNER_TEMP/deen-tsens-map/type3-register-zones.json" <<'PY'
+          import json,sys
+          doc = json.load(open(sys.argv[1]))
+          assert doc["result"] == "PASS_HOST_SOURCE_CONTRACT_ONLY"
+          assert len(doc["source"]["paired_registers"]) == 11
+          assert len(doc["sensor_geometry"]) == 15
+          assert doc["thermal_type3_functional_port"] == "HOLD"
+          assert doc["stock_fdt_direct_comparison"] == "HOLD"
+          assert doc["firmware_boot_flash_merge"] == "HOLD"
+          for board in ("pvt1", "pvt2"):
+              x = doc[board]
+              assert x["gate"] == "PASS_HOST_ONLY" and x["schema_diagnostics"] == 11
+              assert len(x["cpu_thermal_zones"]) == 8
+              assert x["thermal_sensor_runtime"] == "HOLD"
+              assert x["tsens_schema_diagnostic_still_present"]
+          PY
+          sha256sum "$DTBS"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            "$RUNNER_TEMP/deen-tsens-map-out/drivers/thermal/qcom/"{tsens,tsens-v2}.o \
+            > "$RUNNER_TEMP/deen-tsens-map/binary-sha256.txt"
+
+      - name: Archive host-only reports, DTBs and compilation objects
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-tsens-type3-register-zone-audit
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-tsens-map/source-5.15-sha.txt
+            ${{ runner.temp }}/deen-tsens-map/donor-3.18-sha.txt
+            ${{ runner.temp }}/deen-tsens-map/test*.log
+            ${{ runner.temp }}/deen-tsens-map/build.log
+            ${{ runner.temp }}/deen-tsens-map/tsens.o.readelf.txt
+            ${{ runner.temp }}/deen-tsens-map/tsens-v2.o.readelf.txt
+            ${{ runner.temp }}/deen-tsens-map/tsens-binding-schema.log
+            ${{ runner.temp }}/deen-tsens-map/pvt1-schema.log
+            ${{ runner.temp }}/deen-tsens-map/pvt2-schema.log
+            ${{ runner.temp }}/deen-tsens-map/type3-register-zones.json
+            ${{ runner.temp }}/deen-tsens-map/host-gate.log
+            ${{ runner.temp }}/deen-tsens-map/binary-sha256.txt
+            ${{ runner.temp }}/deen-tsens-map-out/.config
+            ${{ runner.temp }}/deen-tsens-map-out/drivers/thermal/qcom/tsens.o
+            ${{ runner.temp }}/deen-tsens-map-out/drivers/thermal/qcom/tsens-v2.o
+            ${{ runner.temp }}/deen-tsens-map-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-tsens-map-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
