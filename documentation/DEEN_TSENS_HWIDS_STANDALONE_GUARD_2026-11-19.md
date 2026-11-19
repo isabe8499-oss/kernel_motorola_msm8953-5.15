@@ -34,8 +34,8 @@ if (data->hw_ids && num_sensors > data->num_sensors) {
 
 Workflow `.github/workflows/deen-ack515-tsens-hwids-standalone.yml` runs:
 - six host tests covering the exact real-source ordering of `#qcom,sensors`, the new guard, the first `data->hw_ids[i]` read and callback checks; positive/negative counts and unchanged fallback path;
-- LLVM 18 `gki_defconfig` from this ACK source and AArch64 compilation of `tsens.o` + `tsens-v2.o`;
-- symbol/ELF header and SHA-256 verification, publishing only object/config/log artifacts.
+- LLVM 18 `gki_defconfig`, then a **transient CI-only** selection `NVMEM=y`, `QCOM_QFPROM=y` and `QCOM_TSENS=y` via `scripts/config`/`olddefconfig`, followed by compilation of `qcom_tsens.o` (including `tsens.o` and `tsens-v2.o`);
+- object classification (LLVM LTO bitcode or AArch64 ELF) and SHA-256 verification, publishing only object/config/log artifacts.
 
 **No kernel Image, boot.img, DTB modifications, flash package, firmware or boot action.**
 
@@ -44,3 +44,9 @@ Workflow `.github/workflows/deen-ack515-tsens-hwids-standalone.yml` runs:
 A successful object build supports **READY_FOR_CODE_REVIEW**, not merge into the documentation-only `main` (different Git history). The source branch `deen/c100-schema-reconcile-v2` is the immediate review base; review its history and hardware dependencies before merging. The proposal does **not** unblock PR #11, runtime TSENS, RPM/SMEM, full Deen defconfig or Android boot.
 
 `TSENS_OBJECT_GUARD = PENDING_CI`; `TSENS_RUNTIME = HOLD`; `DEEN_STOCK_TEMPERATURE = HOLD`; `ACK_INTEGRATION_REVIEW = PENDING`; `BOOT/FLASH/FIRMWARE = HOLD`.
+
+## Primeiro CI: falha de Kbuild por Kconfig não selecionado
+
+[Run #44589007903](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/44589007903) **falhou** na compilação inicial com `No rule to make target 'drivers/thermal/qcom/tsens.o'`. Os seis testes de lógica passaram. A causa foi observada no Makefile/Kconfig exato desta branch: `obj-$(CONFIG_QCOM_TSENS) += qcom_tsens.o`, com `QCOM_TSENS` dependente de `QCOM_QFPROM`. O GKI inicial não selecionava esses componentes para compilação como objetos diretos.
+
+A correção de **workflow apenas** habilita `NVMEM`, `QCOM_QFPROM` e `QCOM_TSENS` no `.config` **temporário do runner**, executa `olddefconfig`, exige LTO Full/CFI inalterados e constrói `drivers/thermal/qcom/qcom_tsens.o` com as unidades reais incluídas pelo Kbuild. A geração pode produzir LLVM bitcode sob Full LTO, portanto o CI classifica bitcode ou objeto ELF AArch64, sem declarar que o kernel foi vinculado ou que o sensor está ativo no hardware. O resultado vermelho histórico foi preservado e não reclassificado.
