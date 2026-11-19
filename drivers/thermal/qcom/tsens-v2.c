@@ -101,6 +101,29 @@ struct tsens_plat_data data_tsens_v2 = {
 	.fields	= tsens_v2_regfields,
 };
 
+/*
+ * MSM8953 / Motorola One (deen) staging descriptor -- NOT a working port.
+ *
+ * The stock C100 FDT audit reports 15 hardware sensor IDs, 1 through 15.
+ * Keep the mapping separate from the generic 0..15 TSENS v2 descriptor.
+ * The callback table, features and calibration are intentionally NOT set:
+ * thermal runtime, register programming and vendor EEPROM have not been
+ * validated. In particular, DO NOT add this to tsens_table / OF match until
+ * the safety gates are satisfied: the existing DT says 16 sensors while this
+ * array has 15, and tsens_probe() copies hw_ids before checking .ops.
+ * No DTB or firmware change is needed here.
+ */
+static unsigned int tsens_msm8953_stage_hw_ids[] = {
+	1, 2, 3, 4, 5, 6, 7, 8,
+	9, 10, 11, 12, 13, 14, 15,
+};
+
+struct tsens_plat_data data_msm8953_stage_only = {
+	.num_sensors	= 15,
+	.hw_ids		= tsens_msm8953_stage_hw_ids,
+	/* .ops / .feat / .fields intentionally NULL -- no probe readiness. */
+};
+
 /* Kept around for backward compatibility with old msm8996.dtsi */
 struct tsens_plat_data data_8996 = {
 	.num_sensors	= 13,
