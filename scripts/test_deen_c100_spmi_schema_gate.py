@@ -16,6 +16,7 @@ class TestDeenSpmiSchemaScope(unittest.TestCase):
     def test_qcom_only_conditional_and_generic_one_window(self):
         y = read("Documentation/devicetree/bindings/spmi/spmi.yaml")
         self.assertIn("const: qcom,spmi-pmic-arb", y)
+        self.assertRegex(y, r"(?m)^  reg:\n    minItems: 1\n    maxItems: 5$")
         self.assertRegex(y, r"then:\s+properties:\s+reg:\s+minItems: 3\s+maxItems: 5")
         self.assertRegex(y, r"else:\s+properties:\s+reg:\s+maxItems: 1")
         self.assertRegex(y, r"if:\s+properties:\s+compatible:\s+contains:\s+const: qcom,spmi-pmic-arb\s+required:\s+- compatible")
