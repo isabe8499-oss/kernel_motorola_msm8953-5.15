@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# HOST-ONLY Kconfig experiment for Deen C100 MSM8953 / ACK 5.15.
+# Merge AFTER gki_defconfig and deen-msm8953-base.fragment in CI.
+# NOT a production defconfig; DO NOT build a flashable image from this file.
+#
+# No remoteproc, firmware, WLAN, display, GPU, camera or thermal activation.
+# These symbols only test missing SMEM -> SMD -> RPM clock dependencies.
+#
+CONFIG_HWSPINLOCK=y
+CONFIG_HWSPINLOCK_QCOM=y
+CONFIG_QCOM_SMEM=y
+CONFIG_RPMSG_QCOM_SMD=y
+CONFIG_QCOM_CLK_SMD_RPM=y
