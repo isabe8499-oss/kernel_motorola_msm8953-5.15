@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Host-only A/B comparison to PR #15: select SMSM only on top of
+# GKI + Deen20 + SMEM/SMD/RPM host5. Do NOT select QCOM_APCS_IPC.
+# SMD-RPM uses legacy qcom,ipc syscon on the candidate DTBs.
+# Not a Deen production config, not evidence of RPM firmware operation.
+CONFIG_QCOM_SMSM=y
