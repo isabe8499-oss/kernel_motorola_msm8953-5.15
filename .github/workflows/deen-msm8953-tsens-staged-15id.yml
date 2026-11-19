@@ -1,0 +1,168 @@
+name: Deen C100 MSM8953 TSENS 15-ID descriptor staging (NO OF match)
+
+on:
+  push:
+    branches:
+      - stage/deen-msm8953-tsens-15hwids-20261119
+  pull_request:
+    branches:
+      - audit/deen-c100-tsens-register-irq-zones-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staged-tsens-no-activation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Checkout proposed 5.15 revision
+        uses: actions/checkout@v4
+
+      - name: Checkout pinned public 3.18 vendor sources read-only
+        uses: actions/checkout@v4
+        with:
+          repository: isabe8499-oss/kernel_motorola_msm8953
+          ref: 1f700e4c2e31c435358e7531dfc0c2e41e2a2684
+          path: vendor318
+          persist-credentials: false
+
+      - name: Install ARM64 build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            binutils-aarch64-linux-gnu libssl-dev libelf-dev \
+            device-tree-compiler python3 python3-venv
+
+      - name: Verify full source provenance and stage-only invariants
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-tsens-stage"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/deen-tsens-stage/source-sha.txt"
+          git -C vendor318 rev-parse HEAD | tee "$RUNNER_TEMP/deen-tsens-stage/donor-sha.txt"
+          grep -qx '1f700e4c2e31c435358e7531dfc0c2e41e2a2684' \
+            "$RUNNER_TEMP/deen-tsens-stage/donor-sha.txt"
+          for TEST in test_deen_msm8953_tsens_stage_only.py \
+                      test_deen_c100_tsens_type3_register_gate.py \
+                      test_deen_c100_tsens_type3_contract.py \
+                      test_deen_c100_spmi_schema_gate.py \
+                      test_deen_c100_rpm_schema_gate.py \
+                      test_deen_c100_rpm_of_match.py \
+                      test_deen_c100_ipc_contract_audit.py; do
+            python3 -m unittest discover -s scripts -p "$TEST" -v \
+              2>&1 | tee "$RUNNER_TEMP/deen-tsens-stage/$TEST.log"
+          done
+
+      - name: Cross-compile real TSENS descriptor object and both Deen DTBs
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-tsens-stage-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          grep -qx 'CONFIG_QCOM_TSENS=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            drivers/thermal/qcom/tsens.o \
+            drivers/thermal/qcom/tsens-v2.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-tsens-stage/build.log"
+          for OBJ in tsens.o tsens-v2.o; do
+            aarch64-linux-gnu-readelf -h "$OUT/drivers/thermal/qcom/$OBJ" \
+              > "$RUNNER_TEMP/deen-tsens-stage/$OBJ.readelf.txt"
+            grep -q AArch64 "$RUNNER_TEMP/deen-tsens-stage/$OBJ.readelf.txt"
+          done
+          aarch64-linux-gnu-nm -S --defined-only \
+            "$OUT/drivers/thermal/qcom/tsens-v2.o" \
+            > "$RUNNER_TEMP/deen-tsens-stage/staged-descriptor-symbols.txt"
+          grep -E 'data_msm8953_stage_only$' \
+            "$RUNNER_TEMP/deen-tsens-stage/staged-descriptor-symbols.txt"
+          grep -E 'tsens_msm8953_stage_hw_ids$' \
+            "$RUNNER_TEMP/deen-tsens-stage/staged-descriptor-symbols.txt"
+          if aarch64-linux-gnu-nm "$OUT/drivers/thermal/qcom/tsens.o" \
+             | grep -E 'data_msm8953_stage_only'; then
+            echo 'ERROR: staged descriptor unexpectedly referenced from generic core'
+            exit 4
+          fi
+
+      - name: Produce full 2024.2 schema logs without suppressing thermal failures
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/deen-tsens-stage/venv"
+          "$RUNNER_TEMP/deen-tsens-stage/venv/bin/pip" install 'dtschema==2024.2'
+          BIN="$RUNNER_TEMP/deen-tsens-stage/venv/bin"
+          "$BIN/dt-doc-validate" Documentation/devicetree/bindings/thermal/qcom-tsens.yaml \
+            > "$RUNNER_TEMP/deen-tsens-stage/tsens-binding.log" 2>&1
+          "$BIN/dt-mk-schema" -j Documentation/devicetree/bindings \
+            > "$RUNNER_TEMP/deen-tsens-stage/all-schemas.json"
+          DTBS="$RUNNER_TEMP/deen-tsens-stage-out/arch/arm64/boot/dts/qcom"
+          for board in pvt1 pvt2; do
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/deen-tsens-stage/all-schemas.json" \
+              "$DTBS/msm8953-motorola-deen-$board.dtb" \
+              > "$RUNNER_TEMP/deen-tsens-stage/$board-schema.log" 2>&1
+            rc=$?
+            set -e
+            echo "$board global dt-schema exit=$rc; 11 known diagnostics remain REVIEW_REQUIRED"
+          done
+
+      - name: Gate register/IRQ zones, immutable DTB hashes, and runtime HOLD
+        run: |
+          set -euo pipefail
+          DTBS="$RUNNER_TEMP/deen-tsens-stage-out/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_c100_tsens_type3_register_gate.py \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            --vendor-tsens "$GITHUB_WORKSPACE/vendor318/drivers/thermal/msm-tsens.c" \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-schema-log "$RUNNER_TEMP/deen-tsens-stage/pvt1-schema.log" \
+            --pvt2-schema-log "$RUNNER_TEMP/deen-tsens-stage/pvt2-schema.log" \
+            --output "$RUNNER_TEMP/deen-tsens-stage/type3-source-gate.json" \
+            2>&1 | tee "$RUNNER_TEMP/deen-tsens-stage/type3-source-gate.log"
+          python3 - "$RUNNER_TEMP/deen-tsens-stage/type3-source-gate.json" <<'PY'
+          import json,sys
+          report=json.load(open(sys.argv[1]))
+          assert report["result"] == "PASS_HOST_SOURCE_CONTRACT_ONLY"
+          assert len(report["source"]["paired_registers"]) == 11
+          assert len(report["sensor_geometry"]) == 15
+          assert report["thermal_type3_functional_port"] == "HOLD"
+          assert report["stock_fdt_direct_comparison"] == "HOLD"
+          assert report["firmware_boot_flash_merge"] == "HOLD"
+          for b in ("pvt1", "pvt2"):
+              assert report[b]["schema_diagnostics"] == 11
+              assert report[b]["tsens_schema_diagnostic_still_present"]
+              assert report[b]["thermal_sensor_runtime"] == "HOLD"
+              assert len(report[b]["cpu_thermal_zones"]) == 8
+          PY
+          sha256sum "$DTBS"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            "$RUNNER_TEMP/deen-tsens-stage-out/drivers/thermal/qcom/"{tsens,tsens-v2}.o \
+            > "$RUNNER_TEMP/deen-tsens-stage/binary-sha256.txt"
+
+      - name: Archive only host objects, DTBs, logs and audit data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-tsens-15id-staged-no-of-match
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-tsens-stage/source-sha.txt
+            ${{ runner.temp }}/deen-tsens-stage/donor-sha.txt
+            ${{ runner.temp }}/deen-tsens-stage/test*.log
+            ${{ runner.temp }}/deen-tsens-stage/build.log
+            ${{ runner.temp }}/deen-tsens-stage/tsens.o.readelf.txt
+            ${{ runner.temp }}/deen-tsens-stage/tsens-v2.o.readelf.txt
+            ${{ runner.temp }}/deen-tsens-stage/staged-descriptor-symbols.txt
+            ${{ runner.temp }}/deen-tsens-stage/tsens-binding.log
+            ${{ runner.temp }}/deen-tsens-stage/pvt1-schema.log
+            ${{ runner.temp }}/deen-tsens-stage/pvt2-schema.log
+            ${{ runner.temp }}/deen-tsens-stage/type3-source-gate.json
+            ${{ runner.temp }}/deen-tsens-stage/type3-source-gate.log
+            ${{ runner.temp }}/deen-tsens-stage/binary-sha256.txt
+            ${{ runner.temp }}/deen-tsens-stage-out/.config
+            ${{ runner.temp }}/deen-tsens-stage-out/drivers/thermal/qcom/tsens.o
+            ${{ runner.temp }}/deen-tsens-stage-out/drivers/thermal/qcom/tsens-v2.o
+            ${{ runner.temp }}/deen-tsens-stage-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-tsens-stage-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
