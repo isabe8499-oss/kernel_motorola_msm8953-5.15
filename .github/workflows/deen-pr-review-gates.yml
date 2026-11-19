@@ -1,0 +1,65 @@
+name: Deen review and integration plan docs-only gate
+
+on:
+  push:
+    branches:
+      - docs/deen-pr-readiness-merge-gates-20261119
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-no-kernel-changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout with full repository metadata
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure ONLY documentation and this docs-only CI changed against main
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          BASE="$(git merge-base HEAD origin/main)"
+          git diff --name-only "$BASE" HEAD | sort | tee changed-files.txt
+          python3 - <<'PY'
+          import pathlib
+          files=set(pathlib.Path("changed-files.txt").read_text().splitlines())
+          allowed={
+              "documentation/DEEN_PR_REVIEW_MERGE_GATES_2026-11-19.md",
+              ".github/workflows/deen-pr-review-gates.yml",
+          }
+          assert files == allowed, f"unexpected changes outside doc gate: {files ^ allowed}"
+          for name in files:
+              assert pathlib.Path(name).is_file()
+          print("PASS_DOCS_ONLY_NO_KERNEL_CHANGES")
+          PY
+
+      - name: Validate review matrix, no-merge claims and remaining HOLD gates
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          p=pathlib.Path("documentation/DEEN_PR_REVIEW_MERGE_GATES_2026-11-19.md")
+          source=p.read_text(encoding="utf-8")
+          for n in (2,3,4,5,6,7,9,10,11,12,13,15):
+              assert f"/pull/{n})" in source, f"missing PR {n}"
+          for marker in (
+              "No common ancestor", "HUMAN_CODE_REVIEW = PENDING",
+              "MAIN_ACK_GIT_HISTORY = UNRELATED", "ACK_SOURCE_MERGE = HOLD",
+              "SMEM/RPM_RUNTIME = HOLD", "TSENS_RUNTIME = HOLD",
+              "GLOBAL_DTB_SCHEMA = REVIEW_REQUIRED", "BOOT_IMAGE = HOLD",
+              "FIRMWARE_ENABLEMENT = HOLD", "FLASH = HOLD",
+              "QCOM_APCS_IPC", "QCOM_SMSM",
+              "READY FOR REVIEW", "DRAFT / HOLD",
+          ):
+              assert marker in source, f"required gate missing: {marker}"
+          assert p.stat().st_size > 1000
+          print("PASS_PR_READINESS_GATE_DOC_ONLY")
+          PY
