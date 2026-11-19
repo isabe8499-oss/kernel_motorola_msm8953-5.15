@@ -1,0 +1,138 @@
+name: Deen C100 static IPC and firmware audit (no flash)
+
+on:
+  push:
+    branches:
+      - audit/c100-memory-ledger-20261119
+    paths:
+      - 'scripts/deen_c100_ipc_contract_audit.py'
+      - 'scripts/test_deen_c100_ipc_contract_audit.py'
+      - '.github/workflows/deen-c100-ipc-contract-audit.yml'
+      - 'documentation/DEEN_C100_IPC_RPM_FIRMWARE_RECONCILIATION_2026-11-19.md'
+  pull_request:
+    branches:
+      - deen/c100-smem-memory-region-fix
+    paths:
+      - 'scripts/deen_c100_ipc_contract_audit.py'
+      - 'scripts/test_deen_c100_ipc_contract_audit.py'
+      - '.github/workflows/deen-c100-ipc-contract-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout audit head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install host DTB tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler python3 python3-venv
+
+      - name: Record exact code provenance
+        run: |
+          set -euo pipefail
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "Source revision: $(git rev-parse HEAD)"
+          sha256sum scripts/deen_fdt_memory_ledger.py \
+            scripts/deen_c100_ipc_contract_audit.py \
+            > "$RUNNER_TEMP/audit-source-sha256.txt"
+
+      - name: Unit-test read-only parsers
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p 'test_deen_c100_ipc_contract_audit.py' -v
+
+      - name: Build candidate PVT1 and PVT2 DTBs (no Image or boot package)
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-ipc-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 defconfig
+          set +e
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-ipc-dtb-build.log"
+          result=${PIPESTATUS[0]}
+          set -e
+          test "$result" -eq 0
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+
+      - name: Audit memory regions, phandles, RPM match table and remoteproc status
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-ipc-out/arch/arm64/boot/dts/qcom"
+          PVT1="$OUT/msm8953-motorola-deen-pvt1.dtb"
+          PVT2="$OUT/msm8953-motorola-deen-pvt2.dtb"
+          python3 scripts/deen_fdt_memory_ledger.py "$PVT1" \
+            --expected-board-id 0xc100 --expected-msm-id 0x125 --strict-structural \
+            > "$RUNNER_TEMP/c100-memory-ledger.json"
+          python3 scripts/deen_fdt_memory_ledger.py "$PVT2" \
+            --expected-board-id 0xc200 --strict-structural \
+            > "$RUNNER_TEMP/c200-memory-ledger.json"
+          python3 scripts/deen_c100_ipc_contract_audit.py "$PVT1" "$PVT2" \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            > "$RUNNER_TEMP/deen-ipc-firmware-audit.json"
+          python3 - "$RUNNER_TEMP/deen-ipc-firmware-audit.json" <<'PY'
+          import json, sys
+          doc = json.load(open(sys.argv[1]))
+          assert doc['overall'] == 'PASS_STATIC_WITH_BLOCKERS'
+          for variant in ('pvt1', 'pvt2'):
+              part = doc[variant]
+              assert part['gate_structural'] == 'PASS_SCOPE_LIMITED'
+              print(variant, 'static:', part['gate_structural'],
+                    'RPM driver match gaps:', part['rpm']['driver_match_gaps'],
+                    'FIRMWARE/BOOT:', part['gate_ipc_firmware_runtime'])
+          PY
+          sha256sum "$PVT1" "$PVT2" | tee "$RUNNER_TEMP/deen-ipc-dtb-sha256.txt"
+
+      - name: Run pinned schema as diagnostics, not PASS
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/dtschema-venv"
+          "$RUNNER_TEMP/dtschema-venv/bin/pip" install 'dtschema==2024.2'
+          BIN="$RUNNER_TEMP/dtschema-venv/bin"
+          "$BIN/dt-mk-schema" -j Documentation/devicetree/bindings > "$RUNNER_TEMP/deen-schema.json"
+          for VARIANT in pvt1 pvt2; do
+            DTB="$RUNNER_TEMP/deen-ipc-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-$VARIANT.dtb"
+            set +e
+            "$BIN/dt-validate" -s "$RUNNER_TEMP/deen-schema.json" "$DTB" \
+              > "$RUNNER_TEMP/$VARIANT-schema.log" 2>&1
+            rc=$?
+            set -e
+            echo "$VARIANT dtschema_exit=$rc; REPORT=REVIEW_REQUIRED, not schema PASS"
+            wc -l "$RUNNER_TEMP/$VARIANT-schema.log"
+          done
+
+      - name: Archive read-only reports and compiled DTBs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-ipc-contract-host-audit
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/deen-ipc-out/.config
+            ${{ runner.temp }}/deen-ipc-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-ipc-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
+            ${{ runner.temp }}/deen-ipc-dtb-build.log
+            ${{ runner.temp }}/audit-source-sha256.txt
+            ${{ runner.temp }}/deen-ipc-dtb-sha256.txt
+            ${{ runner.temp }}/deen-ipc-firmware-audit.json
+            ${{ runner.temp }}/c100-memory-ledger.json
+            ${{ runner.temp }}/c200-memory-ledger.json
+            ${{ runner.temp }}/pvt1-schema.log
+            ${{ runner.temp }}/pvt2-schema.log
