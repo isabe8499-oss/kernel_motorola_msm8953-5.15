@@ -20,12 +20,12 @@ jobs:
       - name: Checkout with full repository metadata
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 4
 
       - name: Ensure ONLY documentation and this docs-only CI changed against main
         run: |
           set -euo pipefail
-          git fetch --no-tags origin main
+          git fetch --no-tags --depth=4 origin main:refs/remotes/origin/main
           BASE="$(git merge-base HEAD origin/main)"
           git diff --name-only "$BASE" HEAD | sort | tee changed-files.txt
           python3 - <<'PY'
