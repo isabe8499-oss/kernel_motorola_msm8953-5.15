@@ -85,6 +85,18 @@ class TestMsm8953TsensStageOnly(unittest.TestCase):
             self.assertLessEqual(r["upper_irq_bit"], 31)
             self.assertLessEqual(r["status"], 0x4a9fff)
 
+    def test_dt_count_override_would_overrun_unbound_fifteen_id_table(self):
+        # HARD HOLD: upstream probe overwrites platform count from the DT node.
+        # Do not bind this 15-entry descriptor while msm8953.dtsi declares 16.
+        core = CORE.read_text()
+        soc = SOC.read_text()
+        self.assertEqual(len(stage_ids()), 15)
+        self.assertIn('of_property_read_u32(np, "#qcom,sensors", &num_sensors);', core)
+        self.assertIn("priv->sensor[i].hw_id = data->hw_ids[i];", core)
+        self.assertIn("#qcom,sensors = <16>;", soc)
+        self.assertNotIn("data_msm8953_stage_only", core)
+        self.assertNotRegex(core, r'\.compatible\s*=\s*"qcom,msm8953-tsens"')
+
     def test_tsens_schema_remains_unmodified_and_not_fake_pass(self):
         schema = BINDING.read_text()
         self.assertIn("qcom,tsens-v2", schema)
