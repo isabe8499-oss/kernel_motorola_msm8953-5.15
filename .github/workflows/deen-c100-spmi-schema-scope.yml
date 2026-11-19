@@ -1,0 +1,151 @@
+name: Deen C100 SPMI binding scoped gate (TSENS HOLD, no flash)
+
+on:
+  push:
+    branches:
+      - fix/deen-c100-spmi-schema-20261119
+  pull_request:
+    branches:
+      - fix/deen-c100-rpm-dtb-schema-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spmi-schema:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout proposed kernel source
+        uses: actions/checkout@v4
+
+      - name: Install host and AArch64 compilation tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler binutils-aarch64-linux-gnu \
+            python3 python3-venv
+
+      - name: Unit tests and provenance
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-spmi"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/deen-spmi/source-sha.txt"
+          for TEST in test_deen_c100_spmi_schema_gate.py \
+                      test_deen_c100_rpm_schema_gate.py \
+                      test_deen_c100_rpm_of_match.py \
+                      test_deen_c100_ipc_contract_audit.py; do
+            python3 -m unittest discover -s scripts -p "$TEST" -v \
+              2>&1 | tee "$RUNNER_TEMP/deen-spmi/$TEST.log"
+          done
+
+      - name: Compile both Deen DTBs and existing Qualcomm SPMI object
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-spmi-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          grep -qx 'CONFIG_SPMI=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            drivers/spmi/spmi-pmic-arb.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-spmi/build.log"
+          test -s "$OUT/drivers/spmi/spmi-pmic-arb.o"
+          aarch64-linux-gnu-readelf -h "$OUT/drivers/spmi/spmi-pmic-arb.o" \
+            > "$RUNNER_TEMP/deen-spmi/spmi-object-elf.txt"
+          grep -q AArch64 "$RUNNER_TEMP/deen-spmi/spmi-object-elf.txt"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+
+      - name: Build pinned complete schema and validate SPMI binding
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/deen-spmi/schema-venv"
+          "$RUNNER_TEMP/deen-spmi/schema-venv/bin/pip" install 'dtschema==2024.2'
+          BIN="$RUNNER_TEMP/deen-spmi/schema-venv/bin"
+          "$BIN/dt-doc-validate" Documentation/devicetree/bindings/spmi/spmi.yaml \
+            2>&1 | tee "$RUNNER_TEMP/deen-spmi/spmi-binding-schema.log"
+          "$BIN/dt-mk-schema" -j Documentation/devicetree/bindings \
+            > "$RUNNER_TEMP/deen-spmi/full-dtschema.json"
+
+      - name: Collect full Deen DTB schema logs and generic SPMI control
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/deen-spmi/schema-venv/bin"
+          SCHEMA="$RUNNER_TEMP/deen-spmi/full-dtschema.json"
+          DTBS="$RUNNER_TEMP/deen-spmi-out/arch/arm64/boot/dts/qcom"
+          for BOARD in pvt1 pvt2; do
+            set +e
+            "$BIN/dt-validate" -s "$SCHEMA" \
+              "$DTBS/msm8953-motorola-deen-$BOARD.dtb" \
+              > "$RUNNER_TEMP/deen-spmi/$BOARD-schema.log" 2>&1
+            RC=$?
+            set -e
+            echo "$BOARD dt-validate rc=$RC; full schema remains REVIEW_REQUIRED"
+          done
+          cat > "$RUNNER_TEMP/deen-spmi/generic-valid.dts" <<'DT'
+          /dts-v1/;
+          / {
+              compatible = "test,spmi-fixture";
+              #address-cells = <1>;
+              #size-cells = <1>;
+              spmi@1000 {
+                  compatible = "sample,spmi-controller";
+                  reg = <0x1000 0x100>;
+                  #address-cells = <2>;
+                  #size-cells = <0>;
+              };
+          };
+          DT
+          sed 's/reg = <0x1000 0x100>;/reg = <0x1000 0x100>, <0x1100 0x100>;/' \
+            "$RUNNER_TEMP/deen-spmi/generic-valid.dts" \
+            > "$RUNNER_TEMP/deen-spmi/generic-invalid.dts"
+          for MODE in valid invalid; do
+            dtc -I dts -O dtb -o "$RUNNER_TEMP/deen-spmi/generic-$MODE.dtb" \
+              "$RUNNER_TEMP/deen-spmi/generic-$MODE.dts"
+            set +e
+            "$BIN/dt-validate" -s "$SCHEMA" \
+              "$RUNNER_TEMP/deen-spmi/generic-$MODE.dtb" \
+              > "$RUNNER_TEMP/deen-spmi/generic-$MODE-schema.log" 2>&1
+            set -e
+          done
+          python3 scripts/deen_c100_spmi_schema_gate.py \
+            --pvt1-dtb "$DTBS/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2-dtb "$DTBS/msm8953-motorola-deen-pvt2.dtb" \
+            --pvt1-log "$RUNNER_TEMP/deen-spmi/pvt1-schema.log" \
+            --pvt2-log "$RUNNER_TEMP/deen-spmi/pvt2-schema.log" \
+            --generic-valid-log "$RUNNER_TEMP/deen-spmi/generic-valid-schema.log" \
+            --generic-invalid-log "$RUNNER_TEMP/deen-spmi/generic-invalid-schema.log" \
+            --output "$RUNNER_TEMP/deen-spmi/spmi-scope-gate.json"
+          sha256sum \
+            "$DTBS"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            "$RUNNER_TEMP/deen-spmi-out/drivers/spmi/spmi-pmic-arb.o" \
+            > "$RUNNER_TEMP/deen-spmi/binary-sha256.txt"
+
+      - name: Publish diagnostics, DTBs and host-only compiled object
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-spmi-schema-scoped-host-only
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-spmi/source-sha.txt
+            ${{ runner.temp }}/deen-spmi/test*.log
+            ${{ runner.temp }}/deen-spmi/build.log
+            ${{ runner.temp }}/deen-spmi/spmi-object-elf.txt
+            ${{ runner.temp }}/deen-spmi/spmi-binding-schema.log
+            ${{ runner.temp }}/deen-spmi/pvt1-schema.log
+            ${{ runner.temp }}/deen-spmi/pvt2-schema.log
+            ${{ runner.temp }}/deen-spmi/generic-valid-schema.log
+            ${{ runner.temp }}/deen-spmi/generic-invalid-schema.log
+            ${{ runner.temp }}/deen-spmi/spmi-scope-gate.json
+            ${{ runner.temp }}/deen-spmi/binary-sha256.txt
+            ${{ runner.temp }}/deen-spmi-out/.config
+            ${{ runner.temp }}/deen-spmi-out/drivers/spmi/spmi-pmic-arb.o
+            ${{ runner.temp }}/deen-spmi-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-spmi-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb

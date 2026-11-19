@@ -25,7 +25,8 @@ properties:
     pattern: "^spmi@.*"
 
   reg:
-    maxItems: 1
+    minItems: 1
+    maxItems: 5
 
   "#address-cells":
     const: 2
@@ -52,6 +53,27 @@ patternProperties:
 
     required:
       - reg
+
+# Qualcomm's PMIC arbiter exposes three register windows on v1 and five on
+# v2+; the generic SPMI bus controller still has a single reg tuple.
+# Qualcomm resource ordering is defined in qcom,spmi-pmic-arb.txt.
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: qcom,spmi-pmic-arb
+      required:
+        - compatible
+    then:
+      properties:
+        reg:
+          minItems: 3
+          maxItems: 5
+    else:
+      properties:
+        reg:
+          maxItems: 1
 
 required:
   - reg
