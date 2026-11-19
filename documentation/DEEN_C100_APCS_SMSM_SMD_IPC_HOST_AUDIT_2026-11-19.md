@@ -67,3 +67,9 @@ CONFIG_QCOM_SMSM=y
 - `MERGE=HOLD`, `BOOT_IMAGE=HOLD`, `FLASH=HOLD`, `FIRMWARE_ENABLEMENT=HOLD`.
 
 Após o CI, decidir em auditoria separada se o kernel candidato realmente precisa de `QCOM_APCS_IPC` como driver mailbox (o fallback syscon pode dispensá-lo) e quais dependências SMSM do boot/vendor são demonstráveis. **Não ativar por suposição, nem esconder os 11 diagnósticos restantes.**
+
+## 6. Primeiro CI — bloqueio proposital de escopo herdado do PR #13
+
+[Run #44583154288](https://github.com/isabe8499-oss/kernel_motorola_msm8953-5.15/actions/runs/44583154288) **falhou no teste sintético host5→host7**, antes de executar Kconfig/compilação. A regra `NO_NEW_ENABLEMENT` herdada do PR #13 ainda incluía `QCOM_SMSM` — apropriado ao escopo anterior, mas incompatível com a proposta nova de medir explicitamente `QCOM_SMSM=y` como segunda opção host-only.
+
+A correção da auditoria **não removeu SMSM da política geral anterior**: apenas neste teste, `if name in NEW: continue` admite `QCOM_APCS_IPC` e `QCOM_SMSM`, que já estão cobertos pelas condições de delta **exatamente de dois símbolos**. Remoteproc, SMP2P, TSENS e periféricos continuam proibidos. Os testes negativos exigem falha caso `QCOM_Q6V5_MSS` seja habilitado. O CI posterior precisa provar que a condicional funciona; o resultado inicial não foi reclassificado como sucesso.
