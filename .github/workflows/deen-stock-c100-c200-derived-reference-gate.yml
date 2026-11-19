@@ -1,0 +1,115 @@
+name: Deen C100 C200 hash-pinned stock reference versus candidate DTBs (NO raw boot in CI)
+
+on:
+  push:
+    branches:
+      - audit/deen-stock-c100-c200-fdt-reconcile-20261119
+  pull_request:
+    branches:
+      - audit/deen-c100-smsm-no-apcs-mailbox-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stock-reference-candidate-diff:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout ACK 5.15 candidate tree (no stock partition files)
+        uses: actions/checkout@v4
+
+      - name: Install host and ARM64 device-tree compilation tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 bc bison flex make \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler
+
+      - name: Run derived reference synthetic negative tests (not a new stock FDT read)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/stock-reference"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/stock-reference/source-sha.txt"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_stock_c100_c200_binary_gate.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/stock-reference/test-stock-reference.log"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_c100_smsm_only_host_gate.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/stock-reference/test-smsm-host.log"
+          echo 'STOCK_DIRECT_IN_CI=HOLD; original boot image is not in GitHub' \
+            | tee "$RUNNER_TEMP/stock-reference/no-stock-binary-notice.txt"
+
+      - name: Compile two non-bootable candidate DTBs, no kernel Image or firmware
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/stock-reference-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig \
+            2>&1 | tee "$RUNNER_TEMP/stock-reference/defconfig.log"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/stock-reference/dtb-build.log"
+          DTB="$OUT/arch/arm64/boot/dts/qcom"
+          sha256sum "$DTB"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            | tee "$RUNNER_TEMP/stock-reference/dtb-sha256.txt"
+
+      - name: Gate candidate DTBs ONLY against previously verified derived stock manifest
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/stock-reference"
+          DTB="$RUNNER_TEMP/stock-reference-out/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_stock_c100_c200_binary_gate.py \
+            --reference documentation/DEEN_STOCK_C100_C200_BINARY_REFERENCE_2026-11-19.json \
+            --candidate-pvt1 "$DTB/msm8953-motorola-deen-pvt1.dtb" \
+            --candidate-pvt2 "$DTB/msm8953-motorola-deen-pvt2.dtb" \
+            --output "$ROOT/candidate-versus-stock-derived-reference.json" \
+            2>&1 | tee "$ROOT/derived-reference-gate.log"
+          python3 - "$ROOT/candidate-versus-stock-derived-reference.json" <<'PY'
+          import json,sys
+          report=json.load(open(sys.argv[1]))
+          assert report["result"] == "PASS_REFERENCE_ONLY_STOCK_DIRECT_NOT_RECHECKED_IN_CI"
+          assert report["stock_binary_directly_read"] is False
+          assert report["stock_fdt_catalog"] is None
+          assert report["smem_ipc_firmware_irq_runtime"] == "HOLD"
+          assert report["tsens_thermal_runtime"] == "HOLD"
+          assert report["full_kernel_boot_flash_merge"] == "HOLD"
+          assert report["stock_vs_candidate_tsens_sensor_count"] == [15,16]
+          assert report["stock_smd_edges"] == [0,1,6,15]
+          assert report["candidate_smd_edges"] == [15]
+          assert report["stock_l2ccc_compatible"] == ["qcom,8953-l2ccc"]
+          assert report["candidate_apcs_compatible"] == [
+              "qcom,msm8953-apcs-kpss-global","syscon"]
+          for board in ("pvt1", "pvt2"):
+              matches=report["numeric_doorbell_matches"][board]
+              assert len(matches) == 3
+              assert all(x["register_mmio"] == 0xb011008 and x["numeric_match"]
+                         and x["host_and_firmware_equivalence"] == "HOLD" for x in matches)
+              assert [x["bit"] for x in matches] == [0,13,19]
+              assert report["candidate"][board]["spmi_windows_match_stock"]
+          print("PASS_REFERENCE_ONLY; STOCK_DIRECT_IN_CI=HOLD; RUNTIME=HOLD")
+          PY
+
+      - name: Archive derived metadata, candidate DTBs and tests, NEVER raw boot stock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-c200-stock-reference-candidate-gate
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/stock-reference/source-sha.txt
+            ${{ runner.temp }}/stock-reference/test-stock-reference.log
+            ${{ runner.temp }}/stock-reference/test-smsm-host.log
+            ${{ runner.temp }}/stock-reference/no-stock-binary-notice.txt
+            ${{ runner.temp }}/stock-reference/defconfig.log
+            ${{ runner.temp }}/stock-reference/dtb-build.log
+            ${{ runner.temp }}/stock-reference/dtb-sha256.txt
+            ${{ runner.temp }}/stock-reference/derived-reference-gate.log
+            ${{ runner.temp }}/stock-reference/candidate-versus-stock-derived-reference.json
+            ${{ runner.temp }}/stock-reference-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/stock-reference-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
