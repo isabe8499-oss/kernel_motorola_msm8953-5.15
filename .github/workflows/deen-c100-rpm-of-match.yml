@@ -1,0 +1,121 @@
+name: Deen C100 RPM OF match object and DTB gate (no flash)
+
+on:
+  push:
+    branches:
+      - fix/deen-c100-rpm-of-match-20261119
+  pull_request:
+    branches:
+      - audit/c100-memory-ledger-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rpm-of-match:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact proposed revision
+        uses: actions/checkout@v4
+
+      - name: Install host and ARM64 cross-build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison build-essential flex gcc-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler binutils-aarch64-linux-gnu \
+            python3 python3-venv
+
+      - name: Record revision and test static RPMsg OF match chain
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-rpm"
+          git rev-parse HEAD > "$RUNNER_TEMP/deen-rpm/source-sha.txt"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_c100_rpm_of_match.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm/host-tests.log"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_c100_ipc_contract_audit.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm/pr3-audit-unit-tests.log"
+
+      - name: Cross-compile ARM64 RPM SMD object and both DTBs
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-rpm-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
+          grep -qx 'CONFIG_QCOM_SMD_RPM=y' "$OUT/.config"
+          grep -qx 'CONFIG_RPMSG_QCOM_SMD=y' "$OUT/.config"
+          grep -qx 'CONFIG_QCOM_SMEM=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            drivers/soc/qcom/smd-rpm.o \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm/build.log"
+          test -s "$OUT/drivers/soc/qcom/smd-rpm.o"
+          aarch64-linux-gnu-readelf -h "$OUT/drivers/soc/qcom/smd-rpm.o" \
+            | tee "$RUNNER_TEMP/deen-rpm/object-elf-header.txt"
+          grep -q 'AArch64' "$RUNNER_TEMP/deen-rpm/object-elf-header.txt"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb"
+          test -s "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb"
+
+      - name: Gate RPM OF match in compiled C100 and C200 DTBs
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-rpm-out/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_c100_ipc_contract_audit.py \
+            "$OUT/msm8953-motorola-deen-pvt1.dtb" \
+            "$OUT/msm8953-motorola-deen-pvt2.dtb" \
+            --kernel-root "$GITHUB_WORKSPACE" \
+            > "$RUNNER_TEMP/deen-rpm/rpm-structural-audit.json"
+          python3 - "$RUNNER_TEMP/deen-rpm/rpm-structural-audit.json" <<'PY'
+          import json, sys
+          doc = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert doc["overall"] == "PASS_STATIC_WITH_BLOCKERS", doc["overall"]
+          for variant in ("pvt1", "pvt2"):
+              v = doc[variant]
+              assert v["gate_structural"] == "PASS_SCOPE_LIMITED", v["errors"]
+              assert v["rpm"]["driver_match_gaps"] == [], v["rpm"]["driver_match_gaps"]
+              transport = next(x for x in v["rpm"]["driver_compatibility"]
+                               if x["name"] == "rpm_transport")
+              assert transport["driver"]["status"] == "OF_MATCH_PRESENT", transport
+              assert v["gate_ipc_firmware_runtime"] == "HOLD"
+              assert v["gate_flash_merge"] == "NOT_AUTHORIZED"
+              print(variant, "RPM OF match PASS_SCOPE_LIMITED; firmware/boot HOLD")
+          PY
+          sha256sum "$OUT"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            "$RUNNER_TEMP/deen-rpm-out/drivers/soc/qcom/smd-rpm.o" \
+            > "$RUNNER_TEMP/deen-rpm/binary-sha256.txt"
+
+      - name: Validate existing binding without editing it
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/deen-rpm/dtschema-venv"
+          "$RUNNER_TEMP/deen-rpm/dtschema-venv/bin/pip" install 'dtschema==2024.2'
+          "$RUNNER_TEMP/deen-rpm/dtschema-venv/bin/dt-doc-validate" \
+            Documentation/devicetree/bindings/soc/qcom/qcom,smd-rpm.yaml \
+            2>&1 | tee "$RUNNER_TEMP/deen-rpm/rpm-binding-validation.log"
+
+      - name: Archive host-side evidence (no Image or flashable package)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-rpm-of-match-object-dtb
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-rpm/source-sha.txt
+            ${{ runner.temp }}/deen-rpm/host-tests.log
+            ${{ runner.temp }}/deen-rpm/pr3-audit-unit-tests.log
+            ${{ runner.temp }}/deen-rpm/build.log
+            ${{ runner.temp }}/deen-rpm/object-elf-header.txt
+            ${{ runner.temp }}/deen-rpm/rpm-structural-audit.json
+            ${{ runner.temp }}/deen-rpm/rpm-binding-validation.log
+            ${{ runner.temp }}/deen-rpm/binary-sha256.txt
+            ${{ runner.temp }}/deen-rpm-out/.config
+            ${{ runner.temp }}/deen-rpm-out/drivers/soc/qcom/smd-rpm.o
+            ${{ runner.temp }}/deen-rpm-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1.dtb
+            ${{ runner.temp }}/deen-rpm-out/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt2.dtb
