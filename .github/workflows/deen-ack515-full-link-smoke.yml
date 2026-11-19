@@ -1,0 +1,119 @@
+name: Deen ACK 5.15 full kernel Image link, host-only, NO flash
+
+on:
+  push:
+    branches: [ci/deen-ack515-full-image-link-smoke-20261119]
+  pull_request:
+    branches: [audit/deen-stock-c100-c200-fdt-reconcile-20261119]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-link:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned LLVM18 and full-build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex make python3 clang-18 llvm-18 lld-18 \
+            libssl-dev libelf-dev dwarves rsync cpio zstd \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+      - name: Resolve GKI Deen20 and restricted SMEM/RPM host5 Kconfig
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/ack-full-out"
+          LOG="$RUNNER_TEMP/ack-full-log"
+          mkdir -p "$OUT" "$LOG"
+          git rev-parse HEAD | tee "$LOG/head-sha.txt"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig \
+            2>&1 | tee "$LOG/gki.log"
+          cp "$OUT/.config" "$LOG/gki.config"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-base.fragment \
+            2>&1 | tee "$LOG/merge-deen20.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$LOG/old-deen20.log"
+          cp "$OUT/.config" "$LOG/deen20.config"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            -O "$OUT" "$OUT/.config" \
+            arch/arm64/configs/deen-msm8953-smem-rpm-host.fragment \
+            2>&1 | tee "$LOG/merge-host5.log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$LOG/old-host5.log"
+          cp "$OUT/.config" "$LOG/host5.config"
+          python3 scripts/deen_gki_smem_rpm_config_gate.py \
+            --gki-config "$LOG/gki.config" \
+            --minimal-config "$LOG/deen20.config" \
+            --host-config "$LOG/host5.config" \
+            --base-fragment arch/arm64/configs/deen-msm8953-base.fragment \
+            --host-fragment arch/arm64/configs/deen-msm8953-smem-rpm-host.fragment \
+            --output "$LOG/config-contract.json" \
+            2>&1 | tee "$LOG/config-contract.log"
+          grep -Fxq 'CONFIG_LTO_CLANG_FULL=y' "$OUT/.config"
+          grep -Fxq 'CONFIG_CFI_CLANG=y' "$OUT/.config"
+          for opt in QCOM_Q6V5_MSS QCOM_Q6V5_PAS QCOM_WCNSS_PIL \
+                     QCOM_SMP2P QCOM_SMSM QCOM_TSENS; do
+            if grep -Fxq "CONFIG_$opt=y" "$OUT/.config"; then
+              echo "FORBIDDEN_ENABLEMENT: $opt"; exit 3
+            fi
+          done
+      - name: Build and link FULL ARM64 Image using Clang18 Full LTO
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/ack-full-out"
+          LOG="$RUNNER_TEMP/ack-full-log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j4 Image \
+            2>&1 | tee "$LOG/full-image-build.log"
+          test -s "$OUT/vmlinux"
+          test -s "$OUT/arch/arm64/boot/Image"
+          llvm-readelf -h "$OUT/vmlinux" > "$LOG/vmlinux-elf.txt"
+          grep -Fq 'AArch64' "$LOG/vmlinux-elf.txt"
+          sha256sum "$OUT/vmlinux" "$OUT/arch/arm64/boot/Image" \
+            > "$LOG/full-image-sha256.txt"
+          wc -c "$OUT/vmlinux" "$OUT/arch/arm64/boot/Image" \
+            > "$LOG/full-image-sizes.txt"
+          echo "PASS_FULL_LINK_HOST_ONLY_NO_BOOT_PACKAGE" | tee "$LOG/full-image-gate.txt"
+      - name: Verify both PVT DTBs still match previously verified candidate hashes
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/ack-full-out"
+          LOG="$RUNNER_TEMP/ack-full-log"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$LOG/dtb-build.log"
+          python3 - "$OUT/arch/arm64/boot/dts/qcom" "$LOG" <<'PY'
+          import hashlib,sys,pathlib
+          folder,log=map(pathlib.Path,sys.argv[1:])
+          expected={
+              "pvt1":"fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
+              "pvt2":"9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05"
+          }
+          for board,digest in expected.items():
+              raw=(folder/("msm8953-motorola-deen-"+board+".dtb")).read_bytes()
+              assert hashlib.sha256(raw).hexdigest()==digest,board
+          (log/"dtb-gate.txt").write_text("PASS_DTB_HASHES_UNCHANGED\n")
+          PY
+      - name: Publish logs and SHA only, never Image, vmlinux or stock boot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-ack515-full-link-host-only-logs
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/ack-full-log/*.log
+            ${{ runner.temp }}/ack-full-log/*.json
+            ${{ runner.temp }}/ack-full-log/*.config
+            ${{ runner.temp }}/ack-full-log/*.txt
