@@ -46,15 +46,25 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/gki-defconfig.log"
           grep -qx 'CONFIG_LTO_CLANG_FULL=y' "$OUT/.config"
           grep -qx 'CONFIG_CFI_CLANG=y' "$OUT/.config"
+          # Only this transient CI .config enables QFPROM -> TSENS. GKI
+          # defaults do not select QCOM_TSENS, so Kbuild has no tsens.o rule.
+          scripts/config --file "$OUT/.config" \
+            -e NVMEM -e QCOM_QFPROM -e QCOM_TSENS
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/olddefconfig.log"
+          grep -qx 'CONFIG_QCOM_QFPROM=y' "$OUT/.config"
+          grep -qx 'CONFIG_QCOM_TSENS=y' "$OUT/.config"
+          grep -qx 'CONFIG_LTO_CLANG_FULL=y' "$OUT/.config"
+          grep -qx 'CONFIG_CFI_CLANG=y' "$OUT/.config"
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
-            drivers/thermal/qcom/tsens.o \
-            drivers/thermal/qcom/tsens-v2.o \
+            drivers/thermal/qcom/qcom_tsens.o \
             2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/build.log"
-          for object in tsens.o tsens-v2.o; do
+          for object in tsens.o tsens-v2.o qcom_tsens.o; do
             test -s "$OUT/drivers/thermal/qcom/$object"
-            llvm-readelf -h "$OUT/drivers/thermal/qcom/$object" \
-              > "$RUNNER_TEMP/ack-tsens-guard/$object.readelf.txt"
-            grep -q AArch64 "$RUNNER_TEMP/ack-tsens-guard/$object.readelf.txt"
+            file "$OUT/drivers/thermal/qcom/$object" \
+              > "$RUNNER_TEMP/ack-tsens-guard/$object.file.txt"
+            grep -Eq 'LLVM IR bitcode|ELF .*ARM aarch64|ELF .*AArch64' \
+              "$RUNNER_TEMP/ack-tsens-guard/$object.file.txt"
           done
           sha256sum "$OUT"/drivers/thermal/qcom/{tsens,tsens-v2}.o \
             > "$RUNNER_TEMP/ack-tsens-guard/object-sha256.txt"
