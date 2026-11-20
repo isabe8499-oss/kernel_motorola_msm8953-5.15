@@ -52,10 +52,14 @@ jobs:
             2>&1 | tee "$LOG/gki.log"
           cp "$OUT/.config" "$LOG/original-gki.config"
           scripts/config --file "$OUT/.config" \
-            -e COMPILE_TEST -e QCOM_MSM8953_CPUCLK_PREFLIGHT
+            -e COMPILE_TEST -e COMMON_CLK_QCOM \
+            -e QCOM_MSM8953_CPUCLK_PREFLIGHT
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
             2>&1 | tee "$LOG/olddefconfig.log"
+          grep -E '^(CONFIG_(COMPILE_TEST|COMMON_CLK_QCOM|QCOM_MSM8953_CPUCLK_PREFLIGHT)=|# CONFIG_(COMPILE_TEST|COMMON_CLK_QCOM|QCOM_MSM8953_CPUCLK_PREFLIGHT) is not set)' "$OUT/.config" \
+            | tee "$LOG/kconfig-resolution.txt"
           grep -Fxq 'CONFIG_COMPILE_TEST=y' "$OUT/.config"
+          grep -Fxq 'CONFIG_COMMON_CLK_QCOM=y' "$OUT/.config"
           grep -Fxq 'CONFIG_QCOM_MSM8953_CPUCLK_PREFLIGHT=y' "$OUT/.config"
           cp "$OUT/.config" "$LOG/compile-test-only.config"
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
