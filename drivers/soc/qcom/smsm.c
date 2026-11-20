@@ -8,6 +8,7 @@
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of_irq.h>
+#include <linux/overflow.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/regmap.h>
@@ -480,7 +481,7 @@ static int qcom_smsm_probe(struct platform_device *pdev)
 	struct smsm_entry *entry;
 	struct qcom_smsm *smsm;
 	u32 *intr_mask;
-	size_t size;
+	size_t size, state_size, mask_size, mask_words;
 	u32 *states;
 	u32 id;
 	int ret;
@@ -494,6 +495,17 @@ static int qcom_smsm_probe(struct platform_device *pdev)
 	ret = smsm_get_size_info(smsm);
 	if (ret)
 		return ret;
+
+	/* SMEM size info is firmware-owned; never trust zero or wrapped sizes. */
+	if (!smsm->num_entries || !smsm->num_hosts ||
+	    check_mul_overflow((size_t)smsm->num_entries,
+			       sizeof(u32), &state_size) ||
+	    check_mul_overflow((size_t)smsm->num_entries,
+			       (size_t)smsm->num_hosts, &mask_words) ||
+	    check_mul_overflow(mask_words, sizeof(u32), &mask_size)) {
+		dev_err(&pdev->dev, "invalid SMSM shared memory dimensions\n");
+		return -EINVAL;
+	}
 
 	smsm->entries = devm_kcalloc(&pdev->dev,
 				     smsm->num_entries,
@@ -539,37 +551,49 @@ static int qcom_smsm_probe(struct platform_device *pdev)
 
 	/* Acquire the main SMSM state vector */
 	ret = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE,
-			      smsm->num_entries * sizeof(u32));
+			      state_size);
 	if (ret < 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev, "unable to allocate shared state entry\n");
 		goto out_put;
 	}
 
-	states = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE, NULL);
+	states = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE, &size);
 	if (IS_ERR(states)) {
 		dev_err(&pdev->dev, "Unable to acquire shared state entry\n");
 		ret = PTR_ERR(states);
 		goto out_put;
 	}
+	if (size < state_size) {
+		dev_err(&pdev->dev, "SMSM shared state entry is too small\n");
+		ret = -EINVAL;
+		goto out_put;
+	}
 
 	/* Acquire the list of interrupt mask vectors */
-	size = smsm->num_entries * smsm->num_hosts * sizeof(u32);
-	ret = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_SMSM_CPU_INTR_MASK, size);
+	ret = qcom_smem_alloc(QCOM_SMEM_HOST_ANY, SMEM_SMSM_CPU_INTR_MASK,
+			      mask_size);
 	if (ret < 0 && ret != -EEXIST) {
 		dev_err(&pdev->dev, "unable to allocate smsm interrupt mask\n");
 		goto out_put;
 	}
 
-	intr_mask = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_CPU_INTR_MASK, NULL);
+	intr_mask = qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_CPU_INTR_MASK,
+				  &size);
 	if (IS_ERR(intr_mask)) {
 		dev_err(&pdev->dev, "unable to acquire shared memory interrupt mask\n");
 		ret = PTR_ERR(intr_mask);
 		goto out_put;
 	}
+	if (size < mask_size) {
+		dev_err(&pdev->dev, "SMSM interrupt mask entry is too small\n");
+		ret = -EINVAL;
+		goto out_put;
+	}
 
 	/* Setup the reference to the local state bits */
 	smsm->local_state = states + smsm->local_host;
-	smsm->subscription = intr_mask + smsm->local_host * smsm->num_hosts;
+	/* Avoid u32 intermediate wrap when indexing the row-major mask. */
+	smsm->subscription = intr_mask + (size_t)smsm->local_host * smsm->num_hosts;
 
 	/* Register the outgoing state */
 	smsm->state = qcom_smem_state_register(local_node, &smsm_state_ops, smsm);
@@ -597,7 +621,7 @@ static int qcom_smsm_probe(struct platform_device *pdev)
 		entry->remote_state = states + id;
 
 		/* Setup subscription pointers and unsubscribe to any kicks */
-		entry->subscription = intr_mask + id * smsm->num_hosts;
+		entry->subscription = intr_mask + (size_t)id * smsm->num_hosts;
 		writel(0, entry->subscription + smsm->local_host);
 
 		ret = smsm_inbound_entry(smsm, entry, node);
