@@ -421,7 +421,7 @@ static irqreturn_t tsens_critical_irq_thread(int irq, void *data)
 			continue;
 		if (!tsens_threshold_violated(priv, hw_id, &d))
 			continue;
-		ret = get_temp_tsens_valid(s, &temp);
+		ret = priv->ops->get_temp(s, &temp);
 		if (ret) {
 			dev_err(priv->dev, "[%u] %s: error reading sensor\n",
 				hw_id, __func__);
@@ -471,7 +471,11 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 			continue;
 		if (!tsens_threshold_violated(priv, hw_id, &d))
 			continue;
-		ret = get_temp_tsens_valid(s, &temp);
+		/* Preserve the legacy IRQ sampling path on pre-v2 controllers. */
+		if (tsens_version(priv) >= VER_2_X)
+			ret = priv->ops->get_temp(s, &temp);
+		else
+			ret = get_temp_tsens_valid(s, &temp);
 		if (ret) {
 			dev_err(priv->dev, "[%u] %s: error reading sensor\n",
 				hw_id, __func__);
