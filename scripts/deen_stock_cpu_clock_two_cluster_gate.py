@@ -15,8 +15,8 @@ import sys
 CPU_REGS = [0, 1, 2, 3, 0x100, 0x101, 0x102, 0x103]
 STOCK_SHA = "6e8ec0eafec86e50b8895f81fc1c4809f0c1e0c674ea82a8640e7a3ace7a9765"
 DTB_SHA = {
-    "PVT1": "fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
-    "PVT2": "9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05",
+    "PVT1": "2c5fb810fdfcae65768167327bdb4ac4ba824aea6cfa2dc4b5117838aa9ae442",
+    "PVT2": "5998d09cae4ebb4b65ebc2e7085ae83ae61ac5a7b8ae6adf3c725f753f20ecff",
 }
 EXPECTED_REGS = [
     ("rcgwr-c0-base", 0x0b114000, 0x68),
