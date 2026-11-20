@@ -32,7 +32,7 @@ class TestSmsmLocalHostBounds(unittest.TestCase):
         check = s.index("if (smsm->local_host >= smsm->num_entries ||", local)
         parse = s.index("smsm_parse_ipc(smsm, id)", check)
         state = s.index("smsm->local_state = states + smsm->local_host;", parse)
-        matrix = s.index("smsm->subscription = intr_mask + smsm->local_host", state)
+        matrix = s.index("smsm->subscription = intr_mask + (size_t)smsm->local_host", state)
         self.assertTrue(probe < local < check < parse < state < matrix)
 
     def test_guard_exits_using_existing_cleanup_path(self):
@@ -65,7 +65,7 @@ class TestSmsmLocalHostBounds(unittest.TestCase):
         self.assertIn("#define SMSM_DEFAULT_NUM_ENTRIES\t8", s)
         self.assertIn("#define SMSM_DEFAULT_NUM_HOSTS\t\t3", s)
         self.assertIn("smsm_get_size_info(smsm)", s)
-        self.assertIn("qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE, NULL)", s)
+        self.assertIn("qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE, &size)", s)
         self.assertIn("qcom_smem_state_register(local_node, &smsm_state_ops, smsm)", s)
 
 
