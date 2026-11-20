@@ -65,7 +65,7 @@ class TestSmsmLocalHostBounds(unittest.TestCase):
         self.assertIn("#define SMSM_DEFAULT_NUM_ENTRIES\t8", s)
         self.assertIn("#define SMSM_DEFAULT_NUM_HOSTS\t\t3", s)
         self.assertIn("smsm_get_size_info(smsm)", s)
-        self.assertIn("qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE, NULL)", s)
+        self.assertIn("qcom_smem_get(QCOM_SMEM_HOST_ANY, SMEM_SMSM_SHARED_STATE, &size)", s)
         self.assertIn("qcom_smem_state_register(local_node, &smsm_state_ops, smsm)", s)
 
 
