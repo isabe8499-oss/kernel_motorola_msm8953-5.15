@@ -319,6 +319,7 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 	if (ret)
 		return ret;
 	if (tsens_version(priv) >= VER_2_X) {
+		/* Each mask field is a single bit, normalized by regmap. */
 		ret = regmap_field_read(priv->rf[UP_INT_MASK_0 + hw_id], &d->up_irq_mask);
 		if (ret)
 			return ret;
@@ -360,16 +361,7 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 	return 0;
 }
 
-static inline u32 masked_irq(u32 hw_id, u32 mask, enum tsens_ver ver)
-{
-	if (ver >= VER_2_X)
-		return mask & (1 << hw_id);
-
-	/* v1, v0.1 don't have a irq mask register */
-	return 0;
-}
-
-/**
+**
  * tsens_critical_irq_thread() - Threaded handler for critical interrupts
  * @irq: irq number
  * @data: tsens controller private data
@@ -430,7 +422,7 @@ static irqreturn_t tsens_critical_irq_thread(int irq, void *data)
 
 		tsens_read_irq_state(priv, hw_id, s, &d);
 		if (d.crit_viol &&
-		    !masked_irq(hw_id, d.crit_irq_mask, tsens_version(priv))) {
+		    !d.crit_irq_mask) {
 			/* Mask critical interrupts, unused on Linux */
 			tsens_set_interrupt(priv, hw_id, CRITICAL, false);
 		}
@@ -487,7 +479,7 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 		tsens_read_irq_state(priv, hw_id, s, &d);
 
 		if (d.up_viol &&
-		    !masked_irq(hw_id, d.up_irq_mask, tsens_version(priv))) {
+		    !d.up_irq_mask) {
 			tsens_set_interrupt(priv, hw_id, UPPER, disable);
 			if (d.up_thresh > temp) {
 				dev_dbg(priv->dev, "[%u] %s: re-arm upper\n",
@@ -498,7 +490,7 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 				/* Keep irq masked */
 			}
 		} else if (d.low_viol &&
-			   !masked_irq(hw_id, d.low_irq_mask, tsens_version(priv))) {
+			   !d.low_irq_mask) {
 			tsens_set_interrupt(priv, hw_id, LOWER, disable);
 			if (d.low_thresh < temp) {
 				dev_dbg(priv->dev, "[%u] %s: re-arm low\n",

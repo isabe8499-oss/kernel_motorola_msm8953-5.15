@@ -76,6 +76,13 @@ class TestType3Candidate(unittest.TestCase):
                       self.driver)
         self.assertRegex(self.v2, r"\.feat\s*= &msm8953_type3_feat,")
 
+    def test_irq_handlers_use_normalized_mask_bits(self):
+        for status, mask in (("up", "up"), ("low", "low"), ("crit", "crit")):
+            with self.subTest(mask=mask):
+                self.assertRegex(self.driver,
+                                 rf"d\.{status}_viol &&\s*!d\.{mask}_irq_mask\)")
+        self.assertNotIn("masked_irq(", self.driver)
+
 
 if __name__ == "__main__":
     unittest.main()
