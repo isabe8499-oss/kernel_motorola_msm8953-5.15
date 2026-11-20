@@ -41,7 +41,7 @@ int msm8953_cpuclk_check_resources(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(msm8953_cpuclk_resources); i++) {
 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 						  msm8953_cpuclk_resources[i].name);
-		if (!res ||
+		if (!res || res->end < res->start ||
 		    resource_size(res) < msm8953_cpuclk_resources[i].minimum_size)
 			return -EINVAL;
 
