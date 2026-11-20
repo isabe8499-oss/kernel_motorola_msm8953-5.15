@@ -29,7 +29,7 @@ def inspect_dtb(path):
     return {
         "status": fdtget(path, NODE, "status"),
         "compatible": fdtget(path, NODE, "compatible"),
-        "sensor_count": [int(x) for x in fdtget(path, NODE, "#qcom,sensors", "d")],
+        "sensor_count": [int(x, 16) for x in fdtget(path, NODE, "#qcom,sensors", "x")],
         "board_id": [int(x, 16) for x in fdtget(path, "/", "qcom,board-id", "x")],
     }
 
