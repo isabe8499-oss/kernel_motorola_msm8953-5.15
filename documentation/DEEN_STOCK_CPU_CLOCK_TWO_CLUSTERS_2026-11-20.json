@@ -121,8 +121,8 @@
       ]
     },
     "dtb_sha256": {
-      "PVT1": "fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
-      "PVT2": "9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05"
+      "PVT1": "2c5fb810fdfcae65768167327bdb4ac4ba824aea6cfa2dc4b5117838aa9ae442",
+      "PVT2": "5998d09cae4ebb4b65ebc2e7085ae83ae61ac5a7b8ae6adf3c725f753f20ecff"
     },
     "cpus": 8,
     "cpu_clock_provider_in_dtb": false,
@@ -136,7 +136,8 @@
       ],
       "address": 184619008,
       "size": 4096
-    }
+    },
+    "pin_scope": "DTBs compiled in GitHub Actions from exact deen/c100-schema-reconcile-v2 base 372a9ae6591f15b691f68cdbd2e6971f2d91c108; these differ from later stacked PR candidate hashes and are not binary stock FDTs"
   },
   "holds": [
     "STOCK_CPU_CLOCK_DIRECT_FDT=PASS_LOCAL_ONLY",
