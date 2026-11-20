@@ -361,7 +361,7 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 	return 0;
 }
 
-**
+/**
  * tsens_critical_irq_thread() - Threaded handler for critical interrupts
  * @irq: irq number
  * @data: tsens controller private data
