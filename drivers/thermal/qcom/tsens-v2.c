@@ -101,6 +101,28 @@ struct tsens_plat_data data_tsens_v2 = {
 	.fields	= tsens_v2_regfields,
 };
 
+/*
+ * Motorola Deen stock C100/C200 reports 15 TYPE3 hardware sensors with
+ * IDs 1..15 (not 16 IDs starting at 0). Several TM offsets coincide with
+ * this v2 layout after splitting the stock 0x4a8000/0x2000 window.
+ *
+ * This is ONLY a source-level candidate descriptor. It must NOT be added
+ * to tsens_table / device-tree compatible matching until SROT init,
+ * calibration, IRQ handling and thermal protection have been validated.
+ * It does not turn the unverified Deen thermal controller on.
+ */
+static unsigned int msm8953_type3_hw_ids[] = {
+	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+};
+
+struct tsens_plat_data data_msm8953_type3_candidate = {
+	.num_sensors	= ARRAY_SIZE(msm8953_type3_hw_ids),
+	.hw_ids		= msm8953_type3_hw_ids,
+	.ops		= &ops_generic_v2,
+	.feat		= &tsens_v2_feat,
+	.fields		= tsens_v2_regfields,
+};
+
 /* Kept around for backward compatibility with old msm8996.dtsi */
 struct tsens_plat_data data_8996 = {
 	.num_sensors	= 13,
