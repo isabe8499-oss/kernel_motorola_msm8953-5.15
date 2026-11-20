@@ -1,0 +1,156 @@
+{
+  "provenance": {
+    "description": "Read-only direct FDT parse from user-provided Deen_Boot_B_Audit.zip / boot_b-original.img, 2026-11-20",
+    "boot_sha256": "6e8ec0eafec86e50b8895f81fc1c4809f0c1e0c674ea82a8640e7a3ace7a9765",
+    "boot_size": 67108864,
+    "stock_fdt": {
+      "C100": {
+        "offset": 12026378,
+        "size": 253704,
+        "sha256": "537dc8c3f0a75fbe0b27d8d32b067c7efa8472dccd86b33698700e7e4022408a"
+      },
+      "C200": {
+        "offset": 11265270,
+        "size": 253704,
+        "sha256": "f1bd9bb41f203ebb443b79bfd38564e6203fb858be3d53d8ad132792952c9a16"
+      }
+    },
+    "stock_binary_committed": false
+  },
+  "stock_cpu_clock": {
+    "node": "/soc/qcom,cpu-clock-8953@b116000",
+    "compatible": [
+      "qcom,cpu-clock-8953"
+    ],
+    "num_clusters": 2,
+    "clock_cells": 1,
+    "registers": [
+      {
+        "name": "rcgwr-c0-base",
+        "address": 185679872,
+        "size": 104
+      },
+      {
+        "name": "rcgwr-c1-base",
+        "address": 184631296,
+        "size": 104
+      },
+      {
+        "name": "c0-pll",
+        "address": 185688064,
+        "size": 1024
+      },
+      {
+        "name": "c0-mux",
+        "address": 185667664,
+        "size": 8
+      },
+      {
+        "name": "c1-mux",
+        "address": 184619088,
+        "size": 8
+      },
+      {
+        "name": "cci-mux",
+        "address": 186454096,
+        "size": 8
+      },
+      {
+        "name": "efuse",
+        "address": 672036,
+        "size": 8
+      }
+    ],
+    "supplies": [
+      "vdd-mx-supply",
+      "vdd-cl-supply"
+    ],
+    "clock_names": [
+      "xo_a"
+    ],
+    "speed_bin_property_names": [
+      "qcom,speed0-bin-v0-cl",
+      "qcom,speed0-bin-v0-cci",
+      "qcom,speed2-bin-v0-cl",
+      "qcom,speed2-bin-v0-cci",
+      "qcom,speed6-bin-v0-cl",
+      "qcom,speed6-bin-v0-cci",
+      "qcom,speed7-bin-v0-cl",
+      "qcom,speed7-bin-v0-cci"
+    ],
+    "cpu_node_regs": [
+      0,
+      1,
+      2,
+      3,
+      256,
+      257,
+      258,
+      259
+    ],
+    "cpu_advertised_clock_frequency_hz": 2016000000,
+    "clock_frequency_is_measured_runtime": false
+  },
+  "stock_l2ccc": [
+    {
+      "node": "/soc/clock-controller@b011000",
+      "compatible": [
+        "qcom,8953-l2ccc"
+      ],
+      "address": 184619008,
+      "size": 4096
+    },
+    {
+      "node": "/soc/clock-controller@b111000",
+      "compatible": [
+        "qcom,8953-l2ccc"
+      ],
+      "address": 185667584,
+      "size": 4096
+    }
+  ],
+  "ack515_candidate": {
+    "board_id": {
+      "PVT1": [
+        77,
+        49408
+      ],
+      "PVT2": [
+        77,
+        49664
+      ]
+    },
+    "dtb_sha256": {
+      "PVT1": "fa9ca9966da457ee45b28fc3e2479ed145bc5cfb20e537faff45ca472b510d1a",
+      "PVT2": "9d3291f5ee86799032efdf4c6bec0b5950a35170bcd88cc77bc1820fb08c2b05"
+    },
+    "cpus": 8,
+    "cpu_clock_provider_in_dtb": false,
+    "cpu_opp_reference_in_dtb": false,
+    "cpu_supply_in_dtb": false,
+    "apcs": {
+      "node": "/soc@0/mailbox@b011000",
+      "compatible": [
+        "qcom,msm8953-apcs-kpss-global",
+        "syscon"
+      ],
+      "address": 184619008,
+      "size": 4096
+    }
+  },
+  "holds": [
+    "STOCK_CPU_CLOCK_DIRECT_FDT=PASS_LOCAL_ONLY",
+    "CI_STOCK_BINARY_DIRECT_RECHECK=NOT_AVAILABLE",
+    "CPU_DVFS_DRIVER_PORT=HOLD",
+    "CPU_VOLTAGE_CCI_CLOCK=HOLD",
+    "SMEM_419_AND_RPM_ACK=HOLD",
+    "THERMAL_TYPE3_RUNTIME=HOLD",
+    "FULL_LTO_GKI=HOLD",
+    "BOOT_FLASH_FIRMWARE_MERGE=HOLD"
+  ],
+  "limitations": [
+    "All stock observations were made locally against user supplied hash-authenticated original boot bytes; CI only checks the derived reference against candidate DTBs.",
+    "CPU clock-frequency in stock DT is a declaration, not a measured or safely deployable operating frequency.",
+    "No proprietary firmware, FDT, boot image or flash artifact is committed."
+  ]
+}
