@@ -1,0 +1,47 @@
+name: Deen TSENS TYPE3 quarantine PVT1 PVT2
+
+on:
+  push:
+    branches: [safety/deen-tsens-type3-hold-dtb-20261119]
+  pull_request:
+    branches: [deen/c100-schema-reconcile-v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-dtbs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install DTB compiler and FDT tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc bison flex make python3 gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu libssl-dev libelf-dev device-tree-compiler
+      - name: Source and negative tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/tsens-hold"
+          git rev-parse HEAD > "$RUNNER_TEMP/tsens-hold/sha.txt"
+          python3 -m unittest discover -s scripts -p 'test_deen_tsens_type3_quarantine_gate.py' -v 2>&1 | tee "$RUNNER_TEMP/tsens-hold/tests.log"
+      - name: Compile both candidate DTBs and verify disabled sensor
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/dtb-out"
+          LOG="$RUNNER_TEMP/tsens-hold"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig 2>&1 | tee "$LOG/defconfig.log"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 qcom/msm8953-motorola-deen-pvt1.dtb qcom/msm8953-motorola-deen-pvt2.dtb 2>&1 | tee "$LOG/dtb.log"
+          D="$OUT/arch/arm64/boot/dts/qcom"
+          python3 scripts/deen_tsens_type3_quarantine_gate.py --pvt1 "$D/msm8953-motorola-deen-pvt1.dtb" --pvt2 "$D/msm8953-motorola-deen-pvt2.dtb" --output "$LOG/report.json" 2>&1 | tee "$LOG/gate.log"
+          sha256sum "$D"/msm8953-motorola-deen-pvt{1,2}.dtb > "$LOG/dtb-hash.txt"
+          echo 'DTB_QUARANTINED_ONLY - BOOT/FLASH/THERMAL=HOLD' > "$LOG/hold.txt"
+      - name: Upload logs and hashes only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-tsens-quarantine-logs
+          retention-days: 14
+          path: ${{ runner.temp }}/tsens-hold/

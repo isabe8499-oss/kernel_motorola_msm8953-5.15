@@ -19,6 +19,20 @@
 #include "pm8953.dtsi"
 
 /*
+ * DEEN THERMAL HOLD: The verified stock C100/C200 FDT uses 15 TSENS_TYPE3
+ * sensors with hardware IDs 1..15. The inherited msm8953.dtsi instead
+ * describes 16 sensors using the unverified generic v2 register map.
+ *
+ * Quarantine this Deen-only controller until its type-3 register mapping,
+ * calibration, IRQs and thermal protection have been reviewed. This is
+ * NOT a safe boot configuration: a correct thermal driver is still required
+ * before producing a flashable image.
+ */
+&tsens0 {
+	status = "disabled";
+};
+
+/*
  * Motorola Deen memory layout:
  * - Move the inherited MSM8953 QSEE region from 0x85b00000/8 MiB
  *   to the Deen-specific 0x84300000/32 MiB region used by mainline Deen.
