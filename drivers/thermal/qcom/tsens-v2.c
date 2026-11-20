@@ -153,11 +153,19 @@ static unsigned int msm8953_type3_hw_ids[] = {
 	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 };
 
+static struct tsens_features msm8953_type3_feat = {
+	.ver_major	= VER_2_X,
+	.crit_int	= 1,
+	.srot_split	= 1,
+	.is_type3	= 1,
+	.max_sensors	= 16,
+};
+
 struct tsens_plat_data data_msm8953_type3_candidate = {
 	.num_sensors	= ARRAY_SIZE(msm8953_type3_hw_ids),
 	.hw_ids		= msm8953_type3_hw_ids,
 	.ops		= &ops_msm8953_type3_candidate,
-	.feat		= &tsens_v2_feat,
+	.feat		= &msm8953_type3_feat,
 	.fields		= tsens_v2_regfields,
 };
 

@@ -584,6 +584,10 @@ static int tsens_enable_irq(struct tsens_priv *priv)
 	int ret;
 	int val = tsens_version(priv) >= VER_2_X ? 7 : 1;
 
+	/* TYPE3 uses thermal-zone trips; its hardware critical gate stays off. */
+	if (priv->feat->is_type3)
+		val = GENMASK(1, 0);
+
 	ret = regmap_field_write(priv->rf[INT_EN], val);
 	if (ret < 0)
 		dev_err(priv->dev, "%s: failed to enable interrupts\n",
@@ -755,6 +759,11 @@ int __init init_common(struct tsens_priv *priv)
 	if (!op)
 		return -EINVAL;
 
+	if (priv->feat->is_type3 && op->num_resources < 2) {
+		ret = -EINVAL;
+		goto err_put_device;
+	}
+
 	if (op->num_resources > 1) {
 		/* DT with separate SROT and TM address space */
 		priv->tm_offset = 0;
@@ -896,7 +905,8 @@ int __init init_common(struct tsens_priv *priv)
 		}
 	}
 
-	if (tsens_version(priv) >= VER_2_X &&  ver_minor > 2) {
+	if (!priv->feat->is_type3 && tsens_version(priv) >= VER_2_X &&
+	    ver_minor > 2) {
 		/* Watchdog is present only on v2.3+ */
 		priv->feat->has_watchdog = 1;
 		for (i = WDOG_BARK_STATUS; i <= CC_MON_MASK; i++) {
@@ -917,9 +927,18 @@ int __init init_common(struct tsens_priv *priv)
 
 	spin_lock_init(&priv->ul_lock);
 
-	/* VER_0 interrupt doesn't need to be enabled */
-	if (tsens_version(priv) >= VER_0_1)
+	if (priv->feat->is_type3) {
+		ret = regmap_field_write(priv->rf[INT_EN], 0);
+		if (ret)
+			goto err_put_device;
+
+		ret = regmap_write(priv->tm_map, priv->fields[UP_INT_MASK_0].reg,
+				   U32_MAX);
+		if (ret)
+			goto err_put_device;
+	} else if (tsens_version(priv) >= VER_0_1) {
 		tsens_enable_irq(priv);
+	}
 
 	tsens_debug_init(op);
 
@@ -1028,7 +1047,7 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 	if (irq < 0) {
 		ret = irq;
 		/* For old DTs with no IRQ defined */
-		if (irq == -ENXIO)
+		if (irq == -ENXIO && !priv->feat->is_type3)
 			ret = 0;
 	} else {
 		/* VER_0 interrupt is TRIGGER_RISING, VER_0_1 and up is ONESHOT */
@@ -1047,7 +1066,7 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 		if (ret)
 			dev_err(&pdev->dev, "%s: failed to get irq\n",
 				__func__);
-		else
+		else if (!priv->feat->is_type3)
 			enable_irq_wake(irq);
 	}
 
@@ -1089,11 +1108,17 @@ static int tsens_register(struct tsens_priv *priv)
 	if (ret < 0)
 		return ret;
 
-	if (priv->feat->crit_int)
+	if (priv->feat->crit_int) {
 		ret = tsens_register_irq(priv, "critical",
 					 tsens_critical_irq_thread);
+		if (ret)
+			return ret;
+	}
 
-	return ret;
+	if (priv->feat->is_type3)
+		return tsens_enable_irq(priv);
+
+	return 0;
 }
 
 static int tsens_probe(struct platform_device *pdev)
@@ -1176,7 +1201,11 @@ static int tsens_probe(struct platform_device *pdev)
 		}
 	}
 
-	return tsens_register(priv);
+	ret = tsens_register(priv);
+	if (ret && priv->feat->is_type3)
+		debugfs_remove_recursive(priv->debug_root);
+
+	return ret;
 }
 
 static int tsens_remove(struct platform_device *pdev)
