@@ -32,7 +32,7 @@ class TestSmsmLocalHostBounds(unittest.TestCase):
         check = s.index("if (smsm->local_host >= smsm->num_entries ||", local)
         parse = s.index("smsm_parse_ipc(smsm, id)", check)
         state = s.index("smsm->local_state = states + smsm->local_host;", parse)
-        matrix = s.index("smsm->subscription = intr_mask + smsm->local_host", state)
+        matrix = s.index("smsm->subscription = intr_mask + (size_t)smsm->local_host", state)
         self.assertTrue(probe < local < check < parse < state < matrix)
 
     def test_guard_exits_using_existing_cleanup_path(self):
