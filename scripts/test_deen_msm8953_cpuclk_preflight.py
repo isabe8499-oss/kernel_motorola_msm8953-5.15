@@ -42,15 +42,17 @@ class TestCpuClockPreflight(unittest.TestCase):
         self.assertIn("resource_size(res) < msm8953_cpuclk_resources[i].minimum_size",
                       self.source)
 
-    def test_voltage_frequency_pairs_require_even_number_of_cells(self):
-        self.assertIn("of_property_count_u32_elems(np, name)", self.source)
-        self.assertIn("if (!cells || (cells & 1))", self.source)
-        self.assertIn("if (bin > 7)", self.source)
-
-    def test_table_names_cover_both_clusters_and_cci(self):
-        self.assertIn('"qcom,speed%u-bin-v0-%s"', self.source)
-        self.assertIn('cci ? "cci" : "cl"', self.source)
+    def test_bin_selection_uses_paired_tables(self):
+        for domain in ("cl", "cci"):
+            self.assertIn(f'"qcom,speed%u-bin-v0-{domain}"', self.source)
+        self.assertIn("cl->length != cci->length", self.source)
+        self.assertIn("if (cl || cci || !bin)", self.source)
         self.assertEqual(len(self.manifest["stock_cpu_clock"]["speed_bin_property_names"]), 8)
+
+    def test_regulator_corners_and_cci_ratio(self):
+        self.assertIn("corner != be32_to_cpu(cci[2 * i + 1])", self.source)
+        self.assertIn("(u64)cci_hz * 5 != (u64)cpu_hz * 2", self.source)
+        self.assertIn("corner > DEEN_MAX_CORNERS", self.source)
 
     def test_no_mmio_or_voltage_changes_and_no_driver_binding(self):
         forbidden = ("readl(", "readl_relaxed(", "writel(", "writel_relaxed(",

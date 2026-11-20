@@ -67,28 +67,84 @@ unsigned int msm8953_cpuclk_speed_bin(u32 efuse_value)
 	return (efuse_value >> 8) & 0x7;
 }
 
-/*
- * Validate the shape of speed-bin voltage/frequency pairs before a future
- * port consumes them. No OPPs or regulators are changed by this helper.
- */
-int msm8953_cpuclk_check_speed_bin_table(const struct device_node *np,
-					 unsigned int bin, bool cci)
+/* Deen's CPR4 apc_corner regulator accepts selectors 1 through 9. */
+#define DEEN_MAX_CORNERS	9
+
+struct msm8953_cpuclk_level {
+	u32 cpu_hz;
+	u32 cci_hz;
+	u32 corner;
+};
+
+struct msm8953_cpuclk_plan {
+	struct msm8953_cpuclk_level levels[DEEN_MAX_CORNERS];
+	unsigned int count;
+	unsigned int bin;
+};
+
+static int msm8953_decode_plan(const __be32 *cl, const __be32 *cci,
+			       unsigned int rows, struct msm8953_cpuclk_plan *plan)
 {
+	unsigned int i;
+	u32 last_cpu = 0, last_corner = 0;
+
+	/* The zero row is a sentinel, not an operating point. */
+	if (rows < 2 || rows > DEEN_MAX_CORNERS + 1 ||
+	    cl[0] || cl[1] || cci[0] || cci[1])
+		return -EINVAL;
+
+	for (i = 1; i < rows; i++) {
+		u32 cpu_hz = be32_to_cpu(cl[2 * i]);
+		u32 cci_hz = be32_to_cpu(cci[2 * i]);
+		u32 corner = be32_to_cpu(cl[2 * i + 1]);
+
+		if (cpu_hz <= last_cpu || !corner || corner < last_corner ||
+		    corner > DEEN_MAX_CORNERS ||
+		    corner != be32_to_cpu(cci[2 * i + 1]) ||
+		    (u64)cci_hz * 5 != (u64)cpu_hz * 2)
+			return -EINVAL;
+
+		plan->levels[i - 1] = (struct msm8953_cpuclk_level) {
+			.cpu_hz = cpu_hz, .cci_hz = cci_hz, .corner = corner,
+		};
+		last_cpu = cpu_hz;
+		last_corner = corner;
+	}
+	plan->count = rows - 1;
+	return 0;
+}
+
+int msm8953_cpuclk_read_plan(const struct device_node *np, unsigned int bin,
+			     struct msm8953_cpuclk_plan *plan)
+{
+	struct msm8953_cpuclk_plan selected = {};
+	const struct property *cl, *cci;
 	char name[32];
-	int cells;
+	int ret;
 
-	if (bin > 7)
+	if (!np || !plan || bin > 7)
 		return -EINVAL;
 
-	scnprintf(name, sizeof(name), "qcom,speed%u-bin-v0-%s",
-		  bin, cci ? "cci" : "cl");
-	cells = of_property_count_u32_elems(np, name);
-	if (cells < 0)
-		return cells;
-
-	/* OEM pairs are frequency-Hz / microvolt values. */
-	if (!cells || (cells & 1))
+	for (;;) {
+		scnprintf(name, sizeof(name), "qcom,speed%u-bin-v0-cl", bin);
+		cl = of_find_property(np, name, NULL);
+		scnprintf(name, sizeof(name), "qcom,speed%u-bin-v0-cci", bin);
+		cci = of_find_property(np, name, NULL);
+		if (cl || cci || !bin)
+			break;
+		bin = 0;
+	}
+	if (!cl && !cci)
+		return -ENOENT;
+	if (!cl || !cci || !cl->value || !cci->value || cl->length <= 0 ||
+	    cl->length != cci->length || cl->length % (2 * sizeof(__be32)))
 		return -EINVAL;
 
+	ret = msm8953_decode_plan(cl->value, cci->value,
+				  cl->length / (2 * sizeof(__be32)), &selected);
+	if (ret)
+		return ret;
+	selected.bin = bin;
+	*plan = selected;
 	return 0;
 }
