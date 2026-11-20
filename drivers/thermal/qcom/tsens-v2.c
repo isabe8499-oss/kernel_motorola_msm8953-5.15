@@ -5,6 +5,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/regmap.h>
 #include "tsens.h"
@@ -102,6 +103,42 @@ struct tsens_plat_data data_tsens_v2 = {
 	.fields	= tsens_v2_regfields,
 };
 
+#define MSM8953_TYPE3_TEMP_SIGN_BIT	11
+#define MSM8953_TYPE3_TEMP_MASK		GENMASK(11, 0)
+#define MSM8953_TYPE3_STATUS_VALID	BIT(21)
+#define MSM8953_TYPE3_MAX_HW_ID		15
+#define MSM8953_TYPE3_READ_ATTEMPTS	3
+
+static int get_temp_msm8953_type3(const struct tsens_sensor *s, int *temp)
+{
+	unsigned int attempt, status, reg;
+	int ret;
+
+	if (!s->hw_id || s->hw_id > MSM8953_TYPE3_MAX_HW_ID)
+		return -EINVAL;
+
+	reg = TM_Sn_STATUS_OFF + sizeof(u32) * s->hw_id;
+	for (attempt = 0; attempt < MSM8953_TYPE3_READ_ATTEMPTS; attempt++) {
+		ret = regmap_read(s->priv->tm_map, reg, &status);
+		if (ret)
+			return ret;
+
+		/* The legacy TYPE3 TM thermal ops use signed deci-degrees C. */
+		if (status & MSM8953_TYPE3_STATUS_VALID) {
+			*temp = sign_extend32(status & MSM8953_TYPE3_TEMP_MASK,
+					      MSM8953_TYPE3_TEMP_SIGN_BIT) * 100;
+			return 0;
+		}
+	}
+
+	return -EAGAIN;
+}
+
+static const struct tsens_ops ops_msm8953_type3_candidate = {
+	.init		= init_common,
+	.get_temp	= get_temp_msm8953_type3,
+};
+
 /*
  * Motorola Deen stock C100/C200 reports 15 TYPE3 hardware sensors with
  * IDs 1..15 (not 16 IDs starting at 0). Several TM offsets coincide with
@@ -119,7 +156,7 @@ static unsigned int msm8953_type3_hw_ids[] = {
 struct tsens_plat_data data_msm8953_type3_candidate = {
 	.num_sensors	= ARRAY_SIZE(msm8953_type3_hw_ids),
 	.hw_ids		= msm8953_type3_hw_ids,
-	.ops		= &ops_generic_v2,
+	.ops		= &ops_msm8953_type3_candidate,
 	.feat		= &tsens_v2_feat,
 	.fields		= tsens_v2_regfields,
 };
