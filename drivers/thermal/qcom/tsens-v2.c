@@ -5,6 +5,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/kernel.h>
 #include <linux/regmap.h>
 #include "tsens.h"
 
