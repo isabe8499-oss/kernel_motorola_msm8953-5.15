@@ -1037,7 +1037,12 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 			      irq_handler_t thread_fn)
 {
 	struct platform_device *pdev;
+	unsigned long flags = IRQF_ONESHOT;
 	int ret, irq;
+
+	/* The Motorola TYPE3 driver requests level-high IRQs explicitly. */
+	if (priv->feat->is_type3)
+		flags |= IRQF_TRIGGER_HIGH;
 
 	pdev = of_find_device_by_node(priv->dev->of_node);
 	if (!pdev)
@@ -1059,7 +1064,7 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 							priv);
 		else
 			ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-							thread_fn, IRQF_ONESHOT,
+							thread_fn, flags,
 							dev_name(&pdev->dev),
 							priv);
 
