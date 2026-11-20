@@ -1,0 +1,92 @@
+name: Deen PVT1 PVT2 stock CPU clock dual-cluster reference gate (NO flash)
+
+on:
+  push:
+    branches:
+      - audit/deen-stock-cpu-clock-two-clusters-20261120
+  pull_request:
+    branches:
+      - deen/c100-schema-reconcile-v2
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpu-clock-reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout ACK 5.15 candidate (no stock boot)
+        uses: actions/checkout@v4
+      - name: Install ARM64 DTB build and host FDT tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 make bc bison flex \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            libssl-dev libelf-dev device-tree-compiler
+      - name: Eight regression tests against SHA-pinned derived CPU clock facts
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/deen-cpu-clock"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/deen-cpu-clock/head-sha.txt"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_stock_cpu_clock_two_cluster_gate.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/deen-cpu-clock/tests.log"
+          echo "ORIGINAL_STOCK_BOOT_DIRECTLY_READ_IN_CI=FALSE" \
+            | tee "$RUNNER_TEMP/deen-cpu-clock/stock-not-in-ci.txt"
+      - name: Compile candidate C100 and C200 DTBs only (no Image or boot.img)
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/deen-cpu-clock-out"
+          LOG="$RUNNER_TEMP/deen-cpu-clock"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig \
+            2>&1 | tee "$LOG/defconfig.log"
+          make O="$OUT" ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j2 \
+            qcom/msm8953-motorola-deen-pvt1.dtb \
+            qcom/msm8953-motorola-deen-pvt2.dtb \
+            2>&1 | tee "$LOG/dtb-build.log"
+          DT="$OUT/arch/arm64/boot/dts/qcom"
+          sha256sum "$DT"/msm8953-motorola-deen-pvt{1,2}.dtb \
+            | tee "$LOG/dtb-sha256.txt"
+      - name: Gate eight compiled CPU nodes, two L2CCC stock windows and APCS
+        run: |
+          set -euo pipefail
+          DT="$RUNNER_TEMP/deen-cpu-clock-out/arch/arm64/boot/dts/qcom"
+          LOG="$RUNNER_TEMP/deen-cpu-clock"
+          python3 scripts/deen_stock_cpu_clock_two_cluster_gate.py \
+            --reference documentation/DEEN_STOCK_CPU_CLOCK_TWO_CLUSTERS_2026-11-20.json \
+            --pvt1 "$DT/msm8953-motorola-deen-pvt1.dtb" \
+            --pvt2 "$DT/msm8953-motorola-deen-pvt2.dtb" \
+            --output "$LOG/cpu-clock-stock-reference.json" \
+            2>&1 | tee "$LOG/gate.log"
+          python3 - "$LOG/cpu-clock-stock-reference.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1]))
+          assert data["gate"] == "PASS_REFERENCE_ONLY_CPU_DVFS_PORT_HOLD"
+          assert data["original_stock_boot_directly_read_in_CI"] is False
+          assert data["stock_cpu_clock_two_clusters"] is True
+          assert data["stock_cpu_clock_mmio_resources"] == 7
+          assert data["stock_l2ccc_windows"] == 2
+          assert data["cpu_dvfs_driver"] == "HOLD"
+          assert data["cpu_voltages_cci_thermal"] == "HOLD"
+          assert data["firmware_boot_flash"] == "HOLD"
+          for board in ("PVT1","PVT2"):
+              assert data["candidate"][board]["cpus_checked"] == 8
+              assert data["candidate"][board]["clock_provider_in_candidate"] is False
+          print("PASS_CPU_CLOCK_SOURCE_REFERENCE_ONLY; CPU_DVFS_BOOT=HOLD")
+          PY
+      - name: Upload reports, SHA and logs ONLY (never boot or Image)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-stock-dual-cluster-cpu-clock-reference-only
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/deen-cpu-clock/*.log
+            ${{ runner.temp }}/deen-cpu-clock/*.txt
+            ${{ runner.temp }}/deen-cpu-clock/*.json
