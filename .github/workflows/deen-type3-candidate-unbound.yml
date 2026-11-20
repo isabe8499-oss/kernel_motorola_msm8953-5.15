@@ -1,0 +1,98 @@
+name: Deen MSM8953 candidate 15-ID TSENS descriptor unbound - host-only
+
+on:
+  push:
+    branches:
+      - prep/deen-msm8953-type3-hw-ids-unbound-20261119
+  pull_request:
+    branches:
+      - fix/ack515-tsens-hwids-bound-standalone-20261119
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ack-tsens-hwids-bound:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout ACK-derived source
+        uses: actions/checkout@v4
+      - name: Install pinned LLVM 18 cross-build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex make python3 libssl-dev libelf-dev \
+            clang-18 llvm-18 lld-18 gcc-aarch64-linux-gnu
+          test -x /usr/lib/llvm-18/bin/clang
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+      - name: Run original TSENS guard tests plus 15-ID unbound candidate tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ack-tsens-guard"
+          git rev-parse HEAD > "$RUNNER_TEMP/ack-tsens-guard/source-sha.txt"
+          python3 -m unittest discover -s scripts \
+            -p "test_deen_tsens_hwids_guard_standalone.py" -v \
+            2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/tests.log"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_type3_candidate_descriptor.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/descriptor-tests.log"
+      - name: Compile genuine TSENS ARM64 objects on GKI without kernel Image
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/ack-tsens-guard-out"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig \
+            2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/gki-defconfig.log"
+          grep -qx 'CONFIG_LTO_CLANG_FULL=y' "$OUT/.config"
+          grep -qx 'CONFIG_CFI_CLANG=y' "$OUT/.config"
+          # Only this transient CI .config enables QFPROM -> TSENS. GKI
+          # defaults do not select QCOM_TSENS, so Kbuild has no tsens.o rule.
+          scripts/config --file "$OUT/.config" \
+            -e NVMEM -e QCOM_QFPROM -e QCOM_TSENS
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/olddefconfig.log"
+          grep -qx 'CONFIG_QCOM_QFPROM=y' "$OUT/.config"
+          grep -qx 'CONFIG_QCOM_TSENS=y' "$OUT/.config"
+          grep -qx 'CONFIG_LTO_CLANG_FULL=y' "$OUT/.config"
+          grep -qx 'CONFIG_CFI_CLANG=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
+            drivers/thermal/qcom/ \
+            2>&1 | tee "$RUNNER_TEMP/ack-tsens-guard/build.log"
+          # Built-in Kbuild uses the per-source .o files and built-in.a.
+          # A standalone composite qcom_tsens.o is NOT guaranteed here.
+          for object in tsens.o tsens-v2.o; do
+            test -s "$OUT/drivers/thermal/qcom/$object"
+            file "$OUT/drivers/thermal/qcom/$object" | \
+              tee "$RUNNER_TEMP/ack-tsens-guard/$object.file.txt"
+            grep -Eiq 'LLVM.*bitcode|ELF.*(aarch64|ARM64)' \
+              "$RUNNER_TEMP/ack-tsens-guard/$object.file.txt"
+          done
+          test -s "$OUT/drivers/thermal/qcom/built-in.a"
+          llvm-ar t "$OUT/drivers/thermal/qcom/built-in.a" | \
+            tee "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
+          grep -Fq '/tsens.o' "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
+          grep -Fq '/tsens-v2.o' "$RUNNER_TEMP/ack-tsens-guard/built-in-members.txt"
+          sha256sum "$OUT"/drivers/thermal/qcom/{tsens,tsens-v2}.o \
+            > "$RUNNER_TEMP/ack-tsens-guard/object-sha256.txt"
+      - name: Preserve host-only build, no boot.img or device firmware
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-msm8953-type3-candidate-host-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/ack-tsens-guard/source-sha.txt
+            ${{ runner.temp }}/ack-tsens-guard/tests.log
+            ${{ runner.temp }}/ack-tsens-guard/descriptor-tests.log
+            ${{ runner.temp }}/ack-tsens-guard/gki-defconfig.log
+            ${{ runner.temp }}/ack-tsens-guard/build.log
+            ${{ runner.temp }}/ack-tsens-guard/tsens.o.file.txt
+            ${{ runner.temp }}/ack-tsens-guard/tsens-v2.o.file.txt
+            ${{ runner.temp }}/ack-tsens-guard/built-in-members.txt
+            ${{ runner.temp }}/ack-tsens-guard/object-sha256.txt
+            ${{ runner.temp }}/ack-tsens-guard-out/.config

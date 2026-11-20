@@ -319,6 +319,7 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 	if (ret)
 		return ret;
 	if (tsens_version(priv) >= VER_2_X) {
+		/* Each mask field is a single bit, normalized by regmap. */
 		ret = regmap_field_read(priv->rf[UP_INT_MASK_0 + hw_id], &d->up_irq_mask);
 		if (ret)
 			return ret;
@@ -357,15 +358,6 @@ static int tsens_read_irq_state(struct tsens_priv *priv, u32 hw_id,
 		(d->up_viol || d->low_viol || d->crit_viol) ? "(V)" : "",
 		d->low_thresh, d->up_thresh, d->crit_thresh);
 
-	return 0;
-}
-
-static inline u32 masked_irq(u32 hw_id, u32 mask, enum tsens_ver ver)
-{
-	if (ver >= VER_2_X)
-		return mask & (1 << hw_id);
-
-	/* v1, v0.1 don't have a irq mask register */
 	return 0;
 }
 
@@ -421,7 +413,7 @@ static irqreturn_t tsens_critical_irq_thread(int irq, void *data)
 			continue;
 		if (!tsens_threshold_violated(priv, hw_id, &d))
 			continue;
-		ret = get_temp_tsens_valid(s, &temp);
+		ret = priv->ops->get_temp(s, &temp);
 		if (ret) {
 			dev_err(priv->dev, "[%u] %s: error reading sensor\n",
 				hw_id, __func__);
@@ -430,7 +422,7 @@ static irqreturn_t tsens_critical_irq_thread(int irq, void *data)
 
 		tsens_read_irq_state(priv, hw_id, s, &d);
 		if (d.crit_viol &&
-		    !masked_irq(hw_id, d.crit_irq_mask, tsens_version(priv))) {
+		    !d.crit_irq_mask) {
 			/* Mask critical interrupts, unused on Linux */
 			tsens_set_interrupt(priv, hw_id, CRITICAL, false);
 		}
@@ -471,7 +463,11 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 			continue;
 		if (!tsens_threshold_violated(priv, hw_id, &d))
 			continue;
-		ret = get_temp_tsens_valid(s, &temp);
+		/* Preserve the legacy IRQ sampling path on pre-v2 controllers. */
+		if (tsens_version(priv) >= VER_2_X)
+			ret = priv->ops->get_temp(s, &temp);
+		else
+			ret = get_temp_tsens_valid(s, &temp);
 		if (ret) {
 			dev_err(priv->dev, "[%u] %s: error reading sensor\n",
 				hw_id, __func__);
@@ -483,7 +479,7 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 		tsens_read_irq_state(priv, hw_id, s, &d);
 
 		if (d.up_viol &&
-		    !masked_irq(hw_id, d.up_irq_mask, tsens_version(priv))) {
+		    !d.up_irq_mask) {
 			tsens_set_interrupt(priv, hw_id, UPPER, disable);
 			if (d.up_thresh > temp) {
 				dev_dbg(priv->dev, "[%u] %s: re-arm upper\n",
@@ -494,7 +490,7 @@ static irqreturn_t tsens_irq_thread(int irq, void *data)
 				/* Keep irq masked */
 			}
 		} else if (d.low_viol &&
-			   !masked_irq(hw_id, d.low_irq_mask, tsens_version(priv))) {
+			   !d.low_irq_mask) {
 			tsens_set_interrupt(priv, hw_id, LOWER, disable);
 			if (d.low_thresh < temp) {
 				dev_dbg(priv->dev, "[%u] %s: re-arm low\n",
@@ -579,6 +575,10 @@ static int tsens_enable_irq(struct tsens_priv *priv)
 {
 	int ret;
 	int val = tsens_version(priv) >= VER_2_X ? 7 : 1;
+
+	/* TYPE3 uses thermal-zone trips; its hardware critical gate stays off. */
+	if (priv->feat->is_type3)
+		val = GENMASK(1, 0);
 
 	ret = regmap_field_write(priv->rf[INT_EN], val);
 	if (ret < 0)
@@ -751,6 +751,11 @@ int __init init_common(struct tsens_priv *priv)
 	if (!op)
 		return -EINVAL;
 
+	if (priv->feat->is_type3 && op->num_resources < 2) {
+		ret = -EINVAL;
+		goto err_put_device;
+	}
+
 	if (op->num_resources > 1) {
 		/* DT with separate SROT and TM address space */
 		priv->tm_offset = 0;
@@ -892,7 +897,8 @@ int __init init_common(struct tsens_priv *priv)
 		}
 	}
 
-	if (tsens_version(priv) >= VER_2_X &&  ver_minor > 2) {
+	if (!priv->feat->is_type3 && tsens_version(priv) >= VER_2_X &&
+	    ver_minor > 2) {
 		/* Watchdog is present only on v2.3+ */
 		priv->feat->has_watchdog = 1;
 		for (i = WDOG_BARK_STATUS; i <= CC_MON_MASK; i++) {
@@ -913,9 +919,18 @@ int __init init_common(struct tsens_priv *priv)
 
 	spin_lock_init(&priv->ul_lock);
 
-	/* VER_0 interrupt doesn't need to be enabled */
-	if (tsens_version(priv) >= VER_0_1)
+	if (priv->feat->is_type3) {
+		ret = regmap_field_write(priv->rf[INT_EN], 0);
+		if (ret)
+			goto err_put_device;
+
+		ret = regmap_write(priv->tm_map, priv->fields[UP_INT_MASK_0].reg,
+				   U32_MAX);
+		if (ret)
+			goto err_put_device;
+	} else if (tsens_version(priv) >= VER_0_1) {
 		tsens_enable_irq(priv);
+	}
 
 	tsens_debug_init(op);
 
@@ -1014,7 +1029,12 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 			      irq_handler_t thread_fn)
 {
 	struct platform_device *pdev;
+	unsigned long flags = IRQF_ONESHOT;
 	int ret, irq;
+
+	/* The Motorola TYPE3 driver requests level-high IRQs explicitly. */
+	if (priv->feat->is_type3)
+		flags |= IRQF_TRIGGER_HIGH;
 
 	pdev = of_find_device_by_node(priv->dev->of_node);
 	if (!pdev)
@@ -1024,7 +1044,7 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 	if (irq < 0) {
 		ret = irq;
 		/* For old DTs with no IRQ defined */
-		if (irq == -ENXIO)
+		if (irq == -ENXIO && !priv->feat->is_type3)
 			ret = 0;
 	} else {
 		/* VER_0 interrupt is TRIGGER_RISING, VER_0_1 and up is ONESHOT */
@@ -1036,14 +1056,14 @@ static int tsens_register_irq(struct tsens_priv *priv, char *irqname,
 							priv);
 		else
 			ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-							thread_fn, IRQF_ONESHOT,
+							thread_fn, flags,
 							dev_name(&pdev->dev),
 							priv);
 
 		if (ret)
 			dev_err(&pdev->dev, "%s: failed to get irq\n",
 				__func__);
-		else
+		else if (!priv->feat->is_type3)
 			enable_irq_wake(irq);
 	}
 
@@ -1085,11 +1105,17 @@ static int tsens_register(struct tsens_priv *priv)
 	if (ret < 0)
 		return ret;
 
-	if (priv->feat->crit_int)
+	if (priv->feat->crit_int) {
 		ret = tsens_register_irq(priv, "critical",
 					 tsens_critical_irq_thread);
+		if (ret)
+			return ret;
+	}
 
-	return ret;
+	if (priv->feat->is_type3)
+		return tsens_enable_irq(priv);
+
+	return 0;
 }
 
 static int tsens_probe(struct platform_device *pdev)
@@ -1172,7 +1198,11 @@ static int tsens_probe(struct platform_device *pdev)
 		}
 	}
 
-	return tsens_register(priv);
+	ret = tsens_register(priv);
+	if (ret && priv->feat->is_type3)
+		debugfs_remove_recursive(priv->debug_root);
+
+	return ret;
 }
 
 static int tsens_remove(struct platform_device *pdev)
