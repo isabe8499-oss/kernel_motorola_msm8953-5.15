@@ -9,7 +9,9 @@
 #include <stddef.h>
 #include <string.h>
 
+#define __iomem
 typedef uint32_t u32;
+typedef uint64_t u64;
 struct clk { unsigned long hz; };
 struct regulator { int vote; };
 struct mutex { int held; };
@@ -241,11 +243,45 @@ static void test_cpufreq(void)
 	free(cleanup_arg);
 }
 
-#define __iomem
+
 #define BIT(n) (1U << (n))
 #define GENMASK(h, l) ((~0U << (l)) & (~0U >> (31 - (h))))
 static u32 readl(const void *p) { return *(const u32 *)p; }
 #include "../drivers/clk/qcom/clk-cpu-msm8953-readback.h"
+
+static int writes, delays, lock_timeout;
+static void writel(u32 value, void *p)
+{
+	assert(delays == 1);
+	*(u32 *)p = value;
+	writes++;
+}
+static void udelay(unsigned int us)
+{
+	assert(us == (delays == 0 ? 1 : 50));
+	delays++;
+}
+#define readl_poll_timeout_atomic(p, val, condition, interval, timeout) \
+	((val = readl(p)), ((condition) && !lock_timeout) ? 0 : -ETIMEDOUT)
+#include "../drivers/clk/qcom/clk-cpu-msm8953-retune.h"
+
+static void test_retune(void)
+{
+	u32 pll[7] = { [0] = BIT(31), [2] = 34, [6] = BIT(3) };
+	u32 rcg[3][2] = {{0, 0x501}, {0, 0x501}, {0, 0x504}};
+	void *mux[3] = {rcg[0], rcg[1], rcg[2]};
+
+	rcg[2][1] = 0x501;
+	assert(deen_retune_integer_pll(pll, mux, 2016000000) == -EIO && !writes);
+	rcg[2][1] = 0x504;
+	assert(deen_retune_integer_pll(pll, mux, 2016000001) == -EINVAL && !writes);
+	assert(!deen_retune_integer_pll(pll, mux, 2016000000));
+	assert(writes == 1 && delays == 2 && pll[2] == 105);
+	delays = 0;
+	lock_timeout = 1;
+	assert(deen_retune_integer_pll(pll, mux, 652800000) == -ETIMEDOUT);
+	assert(writes == 2 && delays == 2 && pll[2] == 34);
+}
 
 static void test_apss_readback(void)
 {
@@ -330,4 +366,5 @@ int main(void)
 	disabled = 0;
 	test_cpufreq();
 	test_apss_readback();
+	test_retune();
 }

@@ -5,6 +5,10 @@
 #include <linux/mutex.h>
 #include <linux/types.h>
 
+#define DEEN_POWER_CLK	0x2e6af930
+#define DEEN_PERF_CLK	0xa0a0dc7f
+#define DEEN_CCI_CLK	0x96854074
+
 struct clk;
 struct device;
 struct device_node;
@@ -35,9 +39,15 @@ struct msm8953_cpuclk_domain {
 	struct msm8953_cpuclk_plan plan;
 	struct clk *power, *perf, *cci;
 	struct regulator *apc;
+	u64 verified_up, verified_down;
+	int (*program)(struct msm8953_cpuclk_domain *d, unsigned long hz);
 	bool (*verify_rate)(struct msm8953_cpuclk_domain *d, unsigned long hz);
 };
 
+bool deen_is_c100(void);
+int deen_apss_program(struct msm8953_cpuclk_domain *d, unsigned long hz);
+void __iomem *deen_read_window(struct device *dev, struct platform_device *supplier,
+			     const char *name, size_t size);
 bool msm8953_cpuclk_has_cpr4(struct device_node *np);
 int msm8953_cpuclk_check_resources(struct platform_device *pdev);
 unsigned int msm8953_cpuclk_speed_bin(u32 efuse_value);

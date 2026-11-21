@@ -71,7 +71,7 @@ class TestCpuClockPreflight(unittest.TestCase):
         m = MAKEFILE.read_text()
         self.assertIn("config QCOM_MSM8953_CPUCLK_PREFLIGHT", k)
         self.assertIn("depends on ARM64 && COMPILE_TEST", k)
-        self.assertIn("obj-$(CONFIG_QCOM_MSM8953_CPUCLK_PREFLIGHT)", m)
+        self.assertIn("obj-$(CONFIG_QCOM_MSM8953_CPUCLK_CORE)", m)
         self.assertNotIn("QCOM_MSM8953_CPUCLK_PREFLIGHT",
                          (ROOT / "arch/arm64/configs/deen-msm8953-base.fragment").read_text())
 
@@ -79,7 +79,7 @@ class TestCpuClockPreflight(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             includes = Path(tmp) / "linux"
             (includes / "regulator").mkdir(parents=True)
-            for header in ("io", "bits", "clk", "cpufreq", "slab", "device", "err", "errno", "kernel", "of",
+            for header in ("delay", "iopoll", "io", "bits", "clk", "cpufreq", "slab", "device", "err", "errno", "kernel", "of",
                            "regulator/consumer", "mutex", "types"):
                 target = includes / (header + ".h")
                 target.write_text("#include_next <linux/errno.h>\n" if header == "errno" else "")

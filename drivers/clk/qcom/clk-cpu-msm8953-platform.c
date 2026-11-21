@@ -13,10 +13,6 @@
 #include "clk-cpu-msm8953.h"
 #include "clk-cpu-msm8953-readback.h"
 
-#define DEEN_POWER_CLK	0x2e6af930
-#define DEEN_PERF_CLK	0xa0a0dc7f
-#define DEEN_CCI_CLK	0x96854074
-
 struct deen_handoff {
 	struct msm8953_cpuclk_domain domain;
 	void __iomem *pll;
@@ -47,7 +43,7 @@ static struct clk *deen_clock(struct device *dev, struct device_node *provider, 
 	return ret ? ERR_PTR(ret) : clk;
 }
 
-static void __iomem *deen_read_window(struct device *dev, struct platform_device *supplier,
+void __iomem *deen_read_window(struct device *dev, struct platform_device *supplier,
 				     const char *name, size_t size)
 {
 	struct resource *res = platform_get_resource_byname(supplier, IORESOURCE_MEM, name);
@@ -106,6 +102,36 @@ static struct regulator *deen_hold_vote(struct device *supplier)
 	return *held;
 }
 
+static ssize_t deen_validation_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct deen_handoff *h = dev_get_drvdata(dev);
+	struct msm8953_cpuclk_domain *d = &h->domain;
+	unsigned long rate;
+	int corner, ret = -EIO;
+	unsigned int i;
+
+	mutex_lock(&d->lock);
+	rate = clk_get_rate(d->power);
+	corner = regulator_get_voltage(d->apc);
+	for (i = 0; i < d->plan.count; i++) {
+		const struct msm8953_cpuclk_level *level = &d->plan.levels[i];
+
+		if (rate == level->cpu_hz && corner >= (int)level->corner &&
+		    corner <= DEEN_MAX_CORNERS && deen_verify_rate(d, rate)) {
+			ret = sysfs_emit(buf, "cpu_hz=%lu cci_hz=%u corner=%d up=%llu down=%llu\n",
+					 rate, level->cci_hz, corner,
+					 d->verified_up, d->verified_down);
+			break;
+		}
+	}
+	mutex_unlock(&d->lock);
+	return ret;
+}
+static DEVICE_ATTR_RO(deen_validation);
+
+static struct attribute *deen_attrs[] = { &dev_attr_deen_validation.attr, NULL };
+ATTRIBUTE_GROUPS(deen);
+
 static int deen_attach(struct platform_device *pdev, struct platform_device *supplier)
 {
 	static const char * const mux_names[] = { "c0-mux", "c1-mux", "cci-mux" };
@@ -158,7 +184,23 @@ static int deen_attach(struct platform_device *pdev, struct platform_device *sup
 	if (ret)
 		return ret;
 	h->domain.verify_rate = deen_verify_rate;
+	h->domain.program = deen_apss_program;
+	platform_set_drvdata(pdev, h);
 	return msm8953_cpuclk_register_cpufreq(dev, &h->domain, dev->of_node);
+}
+
+bool deen_is_c100(void)
+{
+	struct device_node *root;
+	u32 board[2];
+	int ret;
+
+	if (!of_machine_is_compatible("qcom,msm8953-deen"))
+		return false;
+	root = of_find_node_by_path("/");
+	ret = of_property_read_u32_array(root, "qcom,board-id", board, 2);
+	of_node_put(root);
+	return !ret && board[0] == 0x4d && board[1] == 0xc100;
 }
 
 static int deen_probe(struct platform_device *pdev)
@@ -166,16 +208,9 @@ static int deen_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node;
 	struct platform_device *supplier;
 	struct of_phandle_args clock;
-	struct device_node *root;
-	u32 board[2];
 	int index, ret;
 
-	if (!of_machine_is_compatible("qcom,msm8953-deen"))
-		return -ENODEV;
-	root = of_find_node_by_path("/");
-	ret = of_property_read_u32_array(root, "qcom,board-id", board, 2);
-	of_node_put(root);
-	if (ret || board[0] != 0x4d || board[1] != 0xc100)
+	if (!deen_is_c100())
 		return -ENODEV;
 	index = of_property_match_string(np, "clock-names", "cpu0_clk");
 	if (index < 0)
@@ -214,6 +249,7 @@ static const struct of_device_id deen_match[] = {
 
 static struct platform_driver deen_cpufreq_platform = {
 	.probe = deen_probe,
-	.driver = { .name = "deen-cpr4-cpufreq", .of_match_table = deen_match },
+	.driver = { .name = "deen-cpr4-cpufreq", .of_match_table = deen_match,
+		    .dev_groups = deen_groups },
 };
 builtin_platform_driver(deen_cpufreq_platform);

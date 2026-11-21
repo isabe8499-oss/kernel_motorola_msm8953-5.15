@@ -52,31 +52,36 @@ jobs:
             2>&1 | tee "$LOG/gki.log"
           cp "$OUT/.config" "$LOG/original-gki.config"
           scripts/config --file "$OUT/.config" \
-            -e COMPILE_TEST -e COMMON_CLK_QCOM -e REGULATOR -e CPU_FREQ \
-            -e QCOM_MSM8953_CPUCLK_PREFLIGHT -e QCOM_DEEN_PVT1_CPUFREQ
+            -d COMPILE_TEST -e ARCH_QCOM -e COMMON_CLK_QCOM -e REGULATOR -e CPU_FREQ \
+            -d QCOM_MSM8953_CPUCLK_PREFLIGHT -e QCOM_DEEN_PVT1_CPUFREQ
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
             2>&1 | tee "$LOG/olddefconfig.log"
           grep -E '^(CONFIG_(COMPILE_TEST|COMMON_CLK_QCOM|QCOM_MSM8953_CPUCLK_PREFLIGHT)=|# CONFIG_(COMPILE_TEST|COMMON_CLK_QCOM|QCOM_MSM8953_CPUCLK_PREFLIGHT) is not set)' "$OUT/.config" \
             | tee "$LOG/kconfig-resolution.txt"
-          grep -Fxq 'CONFIG_COMPILE_TEST=y' "$OUT/.config"
+          grep -Fxq '# CONFIG_COMPILE_TEST is not set' "$OUT/.config"
           grep -Fxq 'CONFIG_COMMON_CLK_QCOM=y' "$OUT/.config"
-          grep -Fxq 'CONFIG_QCOM_MSM8953_CPUCLK_PREFLIGHT=y' "$OUT/.config"
+          grep -Fxq 'CONFIG_QCOM_MSM8953_CPUCLK_CORE=y' "$OUT/.config"
           grep -Fxq 'CONFIG_QCOM_DEEN_PVT1_CPUFREQ=y' "$OUT/.config"
-          cp "$OUT/.config" "$LOG/compile-test-only.config"
+          cp "$OUT/.config" "$LOG/pvt1-cpufreq.config"
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
             drivers/clk/qcom/clk-cpu-msm8953-preflight.o \
             drivers/clk/qcom/clk-cpu-msm8953-transition.o \
             drivers/clk/qcom/clk-cpu-msm8953-cpufreq.o \
             drivers/clk/qcom/clk-cpu-msm8953-platform.o \
+            drivers/clk/qcom/clk-cpu-msm8953-apss.o \
             2>&1 | tee "$LOG/cpuclk-object.log"
-          for part in preflight transition cpufreq platform; do
+          for part in preflight transition cpufreq platform apss; do
             object="$OUT/drivers/clk/qcom/clk-cpu-msm8953-$part.o"
             test -s "$object"
             file "$object" | tee "$LOG/$part-format.txt"
             grep -Eiq 'LLVM.*bitcode|ELF.*(aarch64|ARM64)' "$LOG/$part-format.txt"
             sha256sum "$object" >> "$LOG/cpuclk-object.sha256"
           done
-          echo 'PASS_CPUCLK_COMPILE_ONLY_NO_CLOCK_PROVIDER_DVFS_HOLD' | tee "$LOG/gate.txt"
+          ld.lld -r "$OUT"/drivers/clk/qcom/clk-cpu-msm8953-{preflight,transition,cpufreq,platform,apss}.o \
+            -o "$LOG/deen-dvfs.o"
+          llvm-nm -u "$LOG/deen-dvfs.o" > "$LOG/unresolved.txt"
+          if grep -Eq ' (msm8953_cpuclk_|deen_)' "$LOG/unresolved.txt"; then exit 1; fi
+          echo 'PASS_PVT1_CPUFREQ_LINK'  | tee "$LOG/gate.txt"
 
       - name: Archive evidence only - no Image, vmlinux or stock boot
         if: always()
