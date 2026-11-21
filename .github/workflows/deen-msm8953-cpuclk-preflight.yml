@@ -1,4 +1,4 @@
-name: Deen MSM8953 CPUCLK source preflight ARM64 - no hardware writes
+name: Deen MSM8953 CPUCLK APSS and CPUFreq - ARM64 and C100 DTB
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            bc bison flex make python3 libssl-dev libelf-dev \
+            bc bison flex make python3 device-tree-compiler libssl-dev libelf-dev \
             clang-18 llvm-18 lld-18 gcc-aarch64-linux-gnu
           echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
 
@@ -41,7 +41,7 @@ jobs:
             -p 'test_deen_msm8953_cpuclk_preflight.py' -v \
             2>&1 | tee "$RUNNER_TEMP/cpuclk-preflight/new-source-tests.log"
 
-      - name: Compile CPUCLK plan and transition objects on ARM64 LLVM18
+      - name: Compile and link the ARM64 driver and build the PVT1 device tree
         run: |
           set -euo pipefail
           export PATH="/usr/lib/llvm-18/bin:$PATH"
@@ -81,7 +81,12 @@ jobs:
             -o "$LOG/deen-dvfs.o"
           llvm-nm -u "$LOG/deen-dvfs.o" > "$LOG/unresolved.txt"
           if grep -Eq ' (msm8953_cpuclk_|deen_)' "$LOG/unresolved.txt"; then exit 1; fi
-          echo 'PASS_PVT1_CPUFREQ_LINK'  | tee "$LOG/gate.txt"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 qcom/msm8953-motorola-deen-pvt1-dvfs.dtb \
+            2>&1 | tee "$LOG/c100-dtb.log"
+          DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1-dvfs.dtb"
+          python3 scripts/deen_validate_pvt1_dvfs_dtb.py "$DTB" | tee "$LOG/c100-bindings.txt"
+          sha256sum "$DTB" > "$LOG/c100-dtb.sha256"
+          echo 'PASS_PVT1_CPUFREQ_LINK' | tee "$LOG/gate.txt"
 
       - name: Archive evidence only - no Image, vmlinux or stock boot
         if: always()

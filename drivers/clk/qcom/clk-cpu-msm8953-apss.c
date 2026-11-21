@@ -9,6 +9,9 @@
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_qos.h>
+#include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
+#include <dt-bindings/power/qcom-rpmpd.h>
 #include <linux/regulator/consumer.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -29,6 +32,7 @@ struct deen_output {
 struct deen_apss {
 	void __iomem *pll;
 	void __iomem *mux[3];
+	void __iomem *ramp[2];
 	struct deen_output outputs[3];
 	struct msm8953_cpuclk_plan plan;
 	struct regulator *mx;
@@ -38,11 +42,25 @@ struct deen_apss {
 	int result;
 };
 
+/* The OEM ramp sequencer ends with DCVS_CFG_CTL=0x400 and a cleared
+ * RC_CFG_UPDATE handshake. Only take over sequencers already in that state.
+ */
+static bool deen_ramps_ready(struct deen_apss *a)
+{
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(a->ramp); i++)
+		if (readl(a->ramp[i] + 0x50) != 0x400 ||
+		    readl(a->ramp[i] + 0x60) & (BIT(8) | GENMASK(31, 16)))
+			return false;
+	return true;
+}
+
 static unsigned long deen_apss_rate(struct deen_apss *a)
 {
 	unsigned long rate = (unsigned long)readl(a->pll + 8) * XO_HZ;
 
-	if (READ_ONCE(a->fault) || !deen_apss_rate_matches(a->pll, a->mux, rate))
+	if (READ_ONCE(a->fault) || !deen_ramps_ready(a) || !deen_apss_rate_matches(a->pll, a->mux, rate))
 		return 0;
 	return rate;
 }
@@ -79,7 +97,7 @@ static int deen_set_pll(struct clk_hw *hw, unsigned long hz, unsigned long paren
 
 	if (READ_ONCE(a->writer) != current || hz != READ_ONCE(a->requested))
 		return -EPERM;
-	if (READ_ONCE(a->fault) || deen_round(hw, hz, &parent) != hz) {
+	if (READ_ONCE(a->fault) || !deen_ramps_ready(a) || deen_round(hw, hz, &parent) != hz) {
 		a->result = -EIO;
 		return -EIO;
 	}
@@ -117,6 +135,45 @@ static void deen_disable_mx(void *arg)
 	regulator_disable(arg);
 }
 
+static void deen_release_mx_domain(void *arg)
+{
+	struct device *dev = arg;
+
+	dev_pm_genpd_set_performance_state(dev, 0);
+	pm_runtime_put_sync(dev);
+	pm_runtime_disable(dev);
+}
+
+static int deen_pin_mx_domain(struct device *dev)
+{
+	struct of_phandle_args pd;
+	bool match;
+	int ret;
+
+	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+					 "#power-domain-cells", 0, &pd);
+	if (ret)
+		return ret;
+	match = pd.args_count == 1 && pd.args[0] == MSM8953_VDDMX_AO &&
+		of_device_is_compatible(pd.np, "qcom,msm8953-rpmpd");
+	of_node_put(pd.np);
+	if (!match || !dev->pm_domain)
+		return -ENODEV;
+	pm_runtime_enable(dev);
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret < 0) {
+		pm_runtime_disable(dev);
+		return ret;
+	}
+	ret = dev_pm_genpd_set_performance_state(dev, RPM_SMD_LEVEL_SVS);
+	if (ret) {
+		pm_runtime_put_sync(dev);
+		pm_runtime_disable(dev);
+		return ret;
+	}
+	return devm_add_action_or_reset(dev, deen_release_mx_domain, dev);
+}
+
 static int deen_pin_mx(struct device *dev, struct deen_apss *a)
 {
 	struct device_node *np = of_parse_phandle(dev->of_node, "vdd-mx-supply", 0);
@@ -124,7 +181,7 @@ static int deen_pin_mx(struct device *dev, struct deen_apss *a)
 	int ret;
 
 	if (!np)
-		return -ENODEV;
+		return deen_pin_mx_domain(dev);
 	levels = of_device_is_compatible(np, "qcom,rpm-smd-regulator") &&
 		 of_property_read_bool(np, "qcom,use-voltage-level");
 	of_node_put(np);
@@ -145,12 +202,14 @@ static int deen_pin_mx(struct device *dev, struct deen_apss *a)
 
 static int deen_apss_probe(struct platform_device *pdev)
 {
+	static const char * const ramp_names[] = { "rcgwr-c0-base", "rcgwr-c1-base" };
 	static const char * const mux_names[] = {"c0-mux", "c1-mux", "cci-mux"};
 	static const char * const names[] = {"deen-a53-power", "deen-a53-perf", "deen-cci"};
 	static const u32 ids[] = {DEEN_POWER_CLK, DEEN_PERF_CLK, DEEN_CCI_CLK};
 	struct device *dev = &pdev->dev;
 	struct deen_apss *a;
 	struct clk *xo;
+	struct regulator *cpr;
 	void __iomem *fuse;
 	unsigned int bin, i;
 	int ret;
@@ -176,6 +235,11 @@ static int deen_apss_probe(struct platform_device *pdev)
 		if (IS_ERR(a->mux[i]))
 			return PTR_ERR(a->mux[i]);
 	}
+	for (i = 0; i < ARRAY_SIZE(ramp_names); i++) {
+		a->ramp[i] = deen_read_window(dev, pdev, ramp_names[i], 0x64);
+		if (IS_ERR(a->ramp[i]))
+			return PTR_ERR(a->ramp[i]);
+	}
 	fuse = deen_read_window(dev, pdev, "efuse", 4);
 	if (IS_ERR(fuse))
 		return PTR_ERR(fuse);
@@ -185,6 +249,10 @@ static int deen_apss_probe(struct platform_device *pdev)
 		return ret;
 	if (!deen_apss_rate(a))
 		return -EIO;
+	/* Wait for the physical CPR4 provider before placing the MX vote. */
+	cpr = devm_regulator_get_optional(dev, "vdd-cl");
+	if (IS_ERR(cpr))
+		return PTR_ERR(cpr);
 	ret = deen_pin_mx(dev, a);
 	if (ret)
 		return ret;
