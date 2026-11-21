@@ -114,11 +114,61 @@ static int msm8953_decode_plan(const __be32 *cl, const __be32 *cci,
 	return 0;
 }
 
+/*
+ * Deen stores CPR corner frequencies consecutively for each silicon bin.
+ * Validate the CPU clock plan against the regulator's own bin, even when
+ * the clock driver selected a fallback frequency table.
+ */
+static int msm8953_check_cpr_corners(const struct device_node *supply,
+				    unsigned int hw_bin,
+				    const struct msm8953_cpuclk_plan *plan)
+{
+	const char *counts = "qcom,cpr-speed-bin-corners";
+	const char *freqs = "qcom,corner-frequencies";
+	u32 corners[8], hz;
+	unsigned int offset = 0, total = 0, i;
+	int ret;
+
+	if (of_property_count_u32_elems(supply, counts) != ARRAY_SIZE(corners))
+		return -EINVAL;
+	ret = of_property_read_u32_array(supply, counts, corners, ARRAY_SIZE(corners));
+	if (ret)
+		return ret;
+
+	for (i = 0; i < ARRAY_SIZE(corners); i++) {
+		if (corners[i] > DEEN_MAX_CORNERS)
+			return -EINVAL;
+		if (i == hw_bin)
+			offset = total;
+		total += corners[i];
+	}
+	if (!corners[hw_bin])
+		return -ENODEV;
+	if (of_property_count_u32_elems(supply, freqs) != total)
+		return -EINVAL;
+
+	for (i = 0; i < plan->count; i++) {
+		const struct msm8953_cpuclk_level *level = &plan->levels[i];
+
+		if (level->corner > corners[hw_bin])
+			return -EINVAL;
+		ret = of_property_read_u32_index(supply, freqs,
+						 offset + level->corner - 1, &hz);
+		if (ret)
+			return ret;
+		if (hz != level->cpu_hz)
+			return -EINVAL;
+	}
+	return 0;
+}
+
 int msm8953_cpuclk_read_plan(const struct device_node *np, unsigned int bin,
 			     struct msm8953_cpuclk_plan *plan)
 {
 	struct msm8953_cpuclk_plan selected = {};
 	const struct property *cl, *cci;
+	struct device_node *supply;
+	unsigned int hw_bin = bin;
 	char name[32];
 	int ret;
 
@@ -144,6 +194,14 @@ int msm8953_cpuclk_read_plan(const struct device_node *np, unsigned int bin,
 				  cl->length / (2 * sizeof(__be32)), &selected);
 	if (ret)
 		return ret;
+	supply = of_parse_phandle(np, "vdd-cl-supply", 0);
+	if (!supply)
+		return -ENODEV;
+	ret = msm8953_check_cpr_corners(supply, hw_bin, &selected);
+	of_node_put(supply);
+	if (ret)
+		return ret;
+
 	selected.bin = bin;
 	*plan = selected;
 	return 0;
