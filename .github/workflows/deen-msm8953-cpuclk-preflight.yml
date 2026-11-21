@@ -29,7 +29,7 @@ jobs:
             clang-18 llvm-18 lld-18 gcc-aarch64-linux-gnu
           echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
 
-      - name: Eight safety and source regression tests
+      - name: Stock reference and CPR4 clock transition tests
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/cpuclk-preflight"
@@ -41,7 +41,7 @@ jobs:
             -p 'test_deen_msm8953_cpuclk_preflight.py' -v \
             2>&1 | tee "$RUNNER_TEMP/cpuclk-preflight/new-source-tests.log"
 
-      - name: Compile first CPUCLK port slice only on ARM64 LLVM18
+      - name: Compile CPUCLK plan and transition objects on ARM64 LLVM18
         run: |
           set -euo pipefail
           export PATH="/usr/lib/llvm-18/bin:$PATH"
@@ -52,7 +52,7 @@ jobs:
             2>&1 | tee "$LOG/gki.log"
           cp "$OUT/.config" "$LOG/original-gki.config"
           scripts/config --file "$OUT/.config" \
-            -e COMPILE_TEST -e COMMON_CLK_QCOM \
+            -e COMPILE_TEST -e COMMON_CLK_QCOM -e REGULATOR \
             -e QCOM_MSM8953_CPUCLK_PREFLIGHT
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
             2>&1 | tee "$LOG/olddefconfig.log"
@@ -64,13 +64,15 @@ jobs:
           cp "$OUT/.config" "$LOG/compile-test-only.config"
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
             drivers/clk/qcom/clk-cpu-msm8953-preflight.o \
+            drivers/clk/qcom/clk-cpu-msm8953-transition.o \
             2>&1 | tee "$LOG/cpuclk-object.log"
-          test -s "$OUT/drivers/clk/qcom/clk-cpu-msm8953-preflight.o"
-          file "$OUT/drivers/clk/qcom/clk-cpu-msm8953-preflight.o" \
-            | tee "$LOG/object-format.txt"
-          grep -Eiq 'LLVM.*bitcode|ELF.*(aarch64|ARM64)' "$LOG/object-format.txt"
-          sha256sum "$OUT/drivers/clk/qcom/clk-cpu-msm8953-preflight.o" \
-            > "$LOG/cpuclk-object.sha256"
+          for part in preflight transition; do
+            object="$OUT/drivers/clk/qcom/clk-cpu-msm8953-$part.o"
+            test -s "$object"
+            file "$object" | tee "$LOG/$part-format.txt"
+            grep -Eiq 'LLVM.*bitcode|ELF.*(aarch64|ARM64)' "$LOG/$part-format.txt"
+            sha256sum "$object" >> "$LOG/cpuclk-object.sha256"
+          done
           echo 'PASS_CPUCLK_COMPILE_ONLY_NO_CLOCK_PROVIDER_DVFS_HOLD' | tee "$LOG/gate.txt"
 
       - name: Archive evidence only - no Image, vmlinux or stock boot

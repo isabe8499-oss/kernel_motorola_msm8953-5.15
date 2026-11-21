@@ -17,6 +17,8 @@
 #include <linux/platform_device.h>
 #include <linux/types.h>
 
+#include "clk-cpu-msm8953.h"
+
 struct msm8953_cpuclk_resource {
 	const char *name;
 	resource_size_t minimum_size;
@@ -66,21 +68,6 @@ unsigned int msm8953_cpuclk_speed_bin(u32 efuse_value)
 {
 	return (efuse_value >> 8) & 0x7;
 }
-
-/* Deen's CPR4 apc_corner regulator accepts selectors 1 through 9. */
-#define DEEN_MAX_CORNERS	9
-
-struct msm8953_cpuclk_level {
-	u32 cpu_hz;
-	u32 cci_hz;
-	u32 corner;
-};
-
-struct msm8953_cpuclk_plan {
-	struct msm8953_cpuclk_level levels[DEEN_MAX_CORNERS];
-	unsigned int count;
-	unsigned int bin;
-};
 
 static int msm8953_decode_plan(const __be32 *cl, const __be32 *cci,
 			       unsigned int rows, struct msm8953_cpuclk_plan *plan)

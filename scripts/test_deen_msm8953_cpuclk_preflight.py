@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 import re
+import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -72,6 +74,20 @@ class TestCpuClockPreflight(unittest.TestCase):
         self.assertIn("obj-$(CONFIG_QCOM_MSM8953_CPUCLK_PREFLIGHT)", m)
         self.assertNotIn("QCOM_MSM8953_CPUCLK_PREFLIGHT",
                          (ROOT / "arch/arm64/configs/deen-msm8953-base.fragment").read_text())
+
+    def test_shared_cpr_clock_transition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            includes = Path(tmp) / "linux"
+            (includes / "regulator").mkdir(parents=True)
+            for header in ("clk", "device", "err", "errno", "kernel", "of",
+                           "regulator/consumer", "mutex", "types"):
+                target = includes / (header + ".h")
+                target.write_text("#include_next <linux/errno.h>\n" if header == "errno" else "")
+            binary = Path(tmp) / "transition"
+            subprocess.run(["cc", "-std=c11", "-Wall", "-Werror", "-fsanitize=undefined",
+                            "-I", tmp, str(ROOT / "scripts/test_deen_cpuclk_transition.c"),
+                            "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
 
     def test_ref_is_not_runtime_validation(self):
         m = self.manifest

@@ -47,10 +47,11 @@ config QCOM_CLK_APCS_MSM8916
 
 config QCOM_MSM8953_CPUCLK_PREFLIGHT
 	bool "MSM8953 CPU clock resource preflight (compile test only)"
-	depends on ARM64 && COMPILE_TEST
+	depends on ARM64 && COMPILE_TEST && REGULATOR
 	help
-	  Compile read-only resource and speed-bin validation helpers for
-	  the MSM8953 CPU clock port. No clock provider, PLL control, or
+	  Compile resource and speed-bin validation helpers for
+	  the MSM8953 CPU clock port and its shared-domain transition code.
+	  No clock provider, PLL control, or
 	  device binding exists yet. Never use this as production DVFS support.
 
 config QCOM_CLK_APCC_MSM8996
