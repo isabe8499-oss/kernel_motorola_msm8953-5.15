@@ -53,6 +53,7 @@ obj-$(CONFIG_QCOM_CLK_APCS_MSM8916) += apcs-msm8916.o
 obj-$(CONFIG_QCOM_CLK_APCC_MSM8996) += clk-cpu-8996.o
 obj-$(CONFIG_QCOM_CLK_APCS_SDX55) += apcs-sdx55.o
 obj-$(CONFIG_QCOM_MSM8953_CPUCLK_PREFLIGHT) += clk-cpu-msm8953-preflight.o clk-cpu-msm8953-transition.o clk-cpu-msm8953-cpufreq.o
+obj-$(CONFIG_QCOM_DEEN_PVT1_CPUFREQ) += clk-cpu-msm8953-platform.o
 obj-$(CONFIG_QCOM_CLK_RPM) += clk-rpm.o
 obj-$(CONFIG_QCOM_CLK_RPMH) += clk-rpmh.o
 obj-$(CONFIG_QCOM_CLK_SMD_RPM) += clk-smd-rpm.o

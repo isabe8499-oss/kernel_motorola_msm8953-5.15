@@ -241,6 +241,40 @@ static void test_cpufreq(void)
 	free(cleanup_arg);
 }
 
+#define __iomem
+#define BIT(n) (1U << (n))
+#define GENMASK(h, l) ((~0U << (l)) & (~0U >> (31 - (h))))
+static u32 readl(const void *p) { return *(const u32 *)p; }
+#include "../drivers/clk/qcom/clk-cpu-msm8953-readback.h"
+
+static void test_apss_readback(void)
+{
+	u32 pll[7] = { [0] = BIT(31), [2] = 105, [6] = BIT(3) };
+	u32 rcg[3][2] = {{0, 0x501}, {0, 0x501}, {0, 0x504}};
+	void *mux[3] = {rcg[0], rcg[1], rcg[2]};
+	unsigned long hz = 2016000000;
+
+	assert(deen_apss_rate_matches(pll, mux, hz));
+	assert(!deen_apss_rate_matches(pll, mux, hz - 1));
+	pll[2]--;
+	assert(!deen_apss_rate_matches(pll, mux, hz));
+	pll[2]++;
+	for (int i = 0; i < 3; i++) {
+		rcg[i][0] = 1;
+		assert(!deen_apss_rate_matches(pll, mux, hz));
+		rcg[i][0] = 0;
+		rcg[i][1] ^= BIT(0);
+		assert(!deen_apss_rate_matches(pll, mux, hz));
+		rcg[i][1] ^= BIT(0) | BIT(8);
+		assert(!deen_apss_rate_matches(pll, mux, hz));
+		rcg[i][1] ^= BIT(8);
+	}
+	pll[6] |= BIT(24);
+	assert(!deen_apss_rate_matches(pll, mux, hz));
+	pll[6] = BIT(3);
+	pll[0] = 0;
+	assert(!deen_apss_rate_matches(pll, mux, hz));
+}
 int main(void)
 {
 	struct msm8953_cpuclk_domain d = {0};
@@ -295,4 +329,5 @@ int main(void)
 	assert(!d.lock.held);
 	disabled = 0;
 	test_cpufreq();
+	test_apss_readback();
 }

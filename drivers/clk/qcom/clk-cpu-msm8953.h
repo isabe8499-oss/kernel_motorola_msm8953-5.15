@@ -8,6 +8,7 @@
 struct clk;
 struct device;
 struct device_node;
+struct platform_device;
 struct regulator;
 
 /* Deen's CPR4 apc_corner regulator accepts selectors 1 through 9. */
@@ -34,8 +35,12 @@ struct msm8953_cpuclk_domain {
 	struct msm8953_cpuclk_plan plan;
 	struct clk *power, *perf, *cci;
 	struct regulator *apc;
+	bool (*verify_rate)(struct msm8953_cpuclk_domain *d, unsigned long hz);
 };
 
+bool msm8953_cpuclk_has_cpr4(struct device_node *np);
+int msm8953_cpuclk_check_resources(struct platform_device *pdev);
+unsigned int msm8953_cpuclk_speed_bin(u32 efuse_value);
 int msm8953_cpuclk_read_plan(const struct device_node *np, unsigned int bin,
 			     struct msm8953_cpuclk_plan *plan);
 int msm8953_cpuclk_domain_init(struct msm8953_cpuclk_domain *d,

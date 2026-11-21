@@ -10,6 +10,23 @@
 
 #include "clk-cpu-msm8953.h"
 
+bool msm8953_cpuclk_has_cpr4(struct device_node *np)
+{
+	struct device_node *supply, *thread, *ctrl;
+	bool is_cpr4;
+
+	supply = of_parse_phandle(np, "vdd-cl-supply", 0);
+	if (!supply)
+		return false;
+	thread = of_get_parent(supply);
+	ctrl = thread ? of_get_parent(thread) : NULL;
+	is_cpr4 = ctrl && of_device_is_compatible(ctrl, "qcom,cpr4-msm8953-apss-regulator");
+	of_node_put(ctrl);
+	of_node_put(thread);
+	of_node_put(supply);
+	return is_cpr4;
+}
+
 /* The clock provider passes its enabled vdd-cl consumer and clock handles
  * before exposing rate changes. It owns their lifetime and the MX vote.
  */
@@ -18,24 +35,13 @@ int msm8953_cpuclk_domain_init(struct msm8953_cpuclk_domain *d,
 			       struct clk *power, struct clk *perf, struct clk *cci,
 			       struct regulator *apc)
 {
-	struct device_node *supply, *thread, *ctrl;
-	bool is_cpr4;
 	int ret;
 
 	if (!d || !dev || !dev->of_node || IS_ERR_OR_NULL(power) ||
 	    IS_ERR_OR_NULL(perf) || IS_ERR_OR_NULL(cci) || IS_ERR_OR_NULL(apc))
 		return -EINVAL;
 
-	supply = of_parse_phandle(dev->of_node, "vdd-cl-supply", 0);
-	if (!supply)
-		return -ENODEV;
-	thread = of_get_parent(supply);
-	ctrl = thread ? of_get_parent(thread) : NULL;
-	is_cpr4 = ctrl && of_device_is_compatible(ctrl, "qcom,cpr4-msm8953-apss-regulator");
-	of_node_put(ctrl);
-	of_node_put(thread);
-	of_node_put(supply);
-	if (!is_cpr4)
+	if (!msm8953_cpuclk_has_cpr4(dev->of_node))
 		return -ENODEV;
 
 	ret = msm8953_cpuclk_read_plan(dev->of_node, hw_bin, &d->plan);
@@ -44,6 +50,7 @@ int msm8953_cpuclk_domain_init(struct msm8953_cpuclk_domain *d,
 
 	mutex_init(&d->lock);
 	d->dev = dev;
+	d->verify_rate = NULL;
 	d->power = power;
 	d->perf = perf;
 	d->cci = cci;
@@ -65,7 +72,8 @@ find_level(const struct msm8953_cpuclk_plan *plan, unsigned long rate)
 static bool domain_matches(struct msm8953_cpuclk_domain *d,
 			   const struct msm8953_cpuclk_level *level)
 {
-	return clk_get_rate(d->power) == level->cpu_hz &&
+	return (!d->verify_rate || d->verify_rate(d, level->cpu_hz)) &&
+	       clk_get_rate(d->power) == level->cpu_hz &&
 	       clk_get_rate(d->perf) == level->cpu_hz &&
 	       clk_get_rate(d->cci) == level->cci_hz;
 }

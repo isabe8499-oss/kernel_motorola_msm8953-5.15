@@ -54,6 +54,14 @@ config QCOM_MSM8953_CPUCLK_PREFLIGHT
 	  No clock provider, PLL control, or
 	  device binding exists yet. Never use this as production DVFS support.
 
+config QCOM_DEEN_PVT1_CPUFREQ
+	bool "Motorola Deen PVT1 APSS CPUFreq handoff"
+	depends on QCOM_MSM8953_CPUCLK_PREFLIGHT && OF
+	help
+	  Connect the C100 CPUFreq node to bound MSM8953 CCF and CPR4
+	  suppliers. Read the running PLL and all three muxes before
+	  accepting frequency changes. Requires the stock clock binding.
+
 config QCOM_CLK_APCC_MSM8996
 	tristate "MSM8996 CPU Clock Controller"
 	select QCOM_KRYO_L2_ACCESSORS

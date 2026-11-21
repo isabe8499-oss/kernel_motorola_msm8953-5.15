@@ -148,14 +148,14 @@ int msm8953_cpuclk_register_cpufreq(struct device *dev,
 	struct deen_cpufreq *df;
 	int ret;
 
-	if (!dev || !dev->of_node || !d || dev != d->dev ||
+	if (!dev || !d || !d->dev || !d->dev->of_node ||
 	    !d->power || !d->plan.count ||
 	    d->plan.count > DEEN_MAX_CORNERS || !np ||
 	    !of_machine_is_compatible("qcom,msm8953-deen") ||
 	    !of_device_is_available(np) ||
 	    !of_device_is_compatible(np, "qcom,msm-cpufreq"))
 		return -EINVAL;
-	ret = check_cpu_clocks(np, dev->of_node);
+	ret = check_cpu_clocks(np, d->dev->of_node);
 	if (ret)
 		return ret;
 	df = devm_kzalloc(dev, sizeof(*df), GFP_KERNEL);
