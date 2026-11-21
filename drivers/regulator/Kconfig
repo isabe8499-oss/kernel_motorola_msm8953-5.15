@@ -25,6 +25,13 @@ menuconfig REGULATOR
 
 if REGULATOR
 
+config REGULATOR_DEEN_C100_MEM_ACC
+	bool "Motorola Deen C100 memory-access corners"
+	depends on ARM64 && OF
+	help
+	  Control the paired L1 and L2 memory-access selectors consumed by
+	  the C100 APSS CPR4 regulator.
+
 config REGULATOR_DEBUG
 	bool "Regulator debug support"
 	help
