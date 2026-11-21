@@ -30,6 +30,7 @@ struct msm8953_cpuclk_plan {
  */
 struct msm8953_cpuclk_domain {
 	struct mutex lock;
+	struct device *dev;
 	struct msm8953_cpuclk_plan plan;
 	struct clk *power, *perf, *cci;
 	struct regulator *apc;
@@ -43,5 +44,9 @@ int msm8953_cpuclk_domain_init(struct msm8953_cpuclk_domain *d,
 			       struct regulator *apc);
 int msm8953_cpuclk_set_rate(struct msm8953_cpuclk_domain *domain,
 			    unsigned long cpu_hz);
+
+int msm8953_cpuclk_register_cpufreq(struct device *dev,
+				    struct msm8953_cpuclk_domain *d,
+				    const struct device_node *np);
 
 #endif

@@ -52,7 +52,7 @@ jobs:
             2>&1 | tee "$LOG/gki.log"
           cp "$OUT/.config" "$LOG/original-gki.config"
           scripts/config --file "$OUT/.config" \
-            -e COMPILE_TEST -e COMMON_CLK_QCOM -e REGULATOR \
+            -e COMPILE_TEST -e COMMON_CLK_QCOM -e REGULATOR -e CPU_FREQ \
             -e QCOM_MSM8953_CPUCLK_PREFLIGHT
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
             2>&1 | tee "$LOG/olddefconfig.log"
@@ -65,8 +65,9 @@ jobs:
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
             drivers/clk/qcom/clk-cpu-msm8953-preflight.o \
             drivers/clk/qcom/clk-cpu-msm8953-transition.o \
+            drivers/clk/qcom/clk-cpu-msm8953-cpufreq.o \
             2>&1 | tee "$LOG/cpuclk-object.log"
-          for part in preflight transition; do
+          for part in preflight transition cpufreq; do
             object="$OUT/drivers/clk/qcom/clk-cpu-msm8953-$part.o"
             test -s "$object"
             file "$object" | tee "$LOG/$part-format.txt"

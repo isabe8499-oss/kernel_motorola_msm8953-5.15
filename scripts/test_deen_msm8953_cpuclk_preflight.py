@@ -79,7 +79,7 @@ class TestCpuClockPreflight(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             includes = Path(tmp) / "linux"
             (includes / "regulator").mkdir(parents=True)
-            for header in ("clk", "device", "err", "errno", "kernel", "of",
+            for header in ("clk", "cpufreq", "slab", "device", "err", "errno", "kernel", "of",
                            "regulator/consumer", "mutex", "types"):
                 target = includes / (header + ".h")
                 target.write_text("#include_next <linux/errno.h>\n" if header == "errno" else "")

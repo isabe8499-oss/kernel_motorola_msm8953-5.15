@@ -43,6 +43,7 @@ int msm8953_cpuclk_domain_init(struct msm8953_cpuclk_domain *d,
 		return ret;
 
 	mutex_init(&d->lock);
+	d->dev = dev;
 	d->power = power;
 	d->perf = perf;
 	d->cci = cci;
@@ -121,9 +122,23 @@ static int transition(struct msm8953_cpuclk_domain *d, unsigned long rate)
 	}
 	if (!domain_matches(d, next))
 		return -EIO;
-	if (corner != next->corner)
-		return regulator_set_voltage(d->apc, next->corner, DEEN_MAX_CORNERS);
-	return 0;
+	if (corner == next->corner)
+		return 0;
+	ret = regulator_set_voltage(d->apc, next->corner, DEEN_MAX_CORNERS);
+	if (ret) {
+		int actual = regulator_get_voltage(d->apc);
+
+		/* CPUFreq must see the completed downclock when a valid higher
+		 * vote remains. A subsequent transition can release that vote.
+		 */
+		if (actual >= (int)next->corner && actual <= DEEN_MAX_CORNERS) {
+			dev_warn_ratelimited(d->dev,
+					     "CPR4 vote release failed (%d), corner %d at %lu Hz\n",
+					     ret, actual, rate);
+			return 0;
+		}
+	}
+	return ret;
 }
 
 int msm8953_cpuclk_set_rate(struct msm8953_cpuclk_domain *domain,
