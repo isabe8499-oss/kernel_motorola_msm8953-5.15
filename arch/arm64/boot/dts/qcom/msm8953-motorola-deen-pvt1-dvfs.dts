@@ -65,7 +65,7 @@
 	};
 
 	deen_mem_acc: regulator@19461d4 {
-		compatible = "qcom,mem-acc-regulator";
+		compatible = "motorola,deen-c100-mem-acc", "qcom,mem-acc-regulator";
 		reg = <0x19461d4 0x4 0x19461d8 0x4>;
 		reg-names = "acc-sel-l1", "acc-sel-l2";
 		regulator-name = "apc_mem_acc_corner";

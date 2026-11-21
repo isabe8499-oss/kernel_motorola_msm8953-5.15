@@ -69,6 +69,7 @@ jobs:
             drivers/clk/qcom/clk-cpu-msm8953-cpufreq.o \
             drivers/clk/qcom/clk-cpu-msm8953-platform.o \
             drivers/clk/qcom/clk-cpu-msm8953-apss.o \
+            drivers/regulator/msm8953-deen-mem-acc.o \
             2>&1 | tee "$LOG/cpuclk-object.log"
           for part in preflight transition cpufreq platform apss; do
             object="$OUT/drivers/clk/qcom/clk-cpu-msm8953-$part.o"
@@ -77,6 +78,8 @@ jobs:
             grep -Eiq 'LLVM.*bitcode|ELF.*(aarch64|ARM64)' "$LOG/$part-format.txt"
             sha256sum "$object" >> "$LOG/cpuclk-object.sha256"
           done
+          test -s "$OUT/drivers/regulator/msm8953-deen-mem-acc.o"
+          grep -Fxq 'CONFIG_REGULATOR_DEEN_C100_MEM_ACC=y' "$OUT/.config"
           ld.lld -r "$OUT"/drivers/clk/qcom/clk-cpu-msm8953-{preflight,transition,cpufreq,platform,apss}.o \
             -o "$LOG/deen-dvfs.o"
           llvm-nm -u "$LOG/deen-dvfs.o" > "$LOG/unresolved.txt"

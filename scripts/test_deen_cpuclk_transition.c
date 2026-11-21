@@ -311,6 +311,35 @@ static void test_apss_readback(void)
 	pll[0] = 0;
 	assert(!deen_apss_rate_matches(pll, mux, hz));
 }
+static void *ignore_write;
+static void acc_write(u32 value, void *ptr)
+{
+	if (ptr != ignore_write)
+		*(u32 *)ptr = value;
+}
+
+#define writel acc_write
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+#include "../drivers/regulator/msm8953-deen-mem-acc.h"
+#undef writel
+
+static void test_mem_acc(void)
+{
+	u32 banks[] = {0xf5, 0x33};
+	struct deen_acc acc = {.sel = {&banks[0], &banks[1]}};
+
+	assert(deen_acc_get(&acc) == 0);
+	assert(deen_acc_set(&acc, 2) == -EINVAL);
+	assert(!deen_acc_set(&acc, 1) && deen_acc_get(&acc) == 1);
+	assert(banks[0] == 0xf4 && banks[1] == 0x32);
+	ignore_write = &banks[1];
+	assert(deen_acc_set(&acc, 0) == -EIO);
+	assert(banks[0] == 0xf4 && banks[1] == 0x32);
+	ignore_write = NULL;
+	assert(!deen_acc_set(&acc, 0) && deen_acc_get(&acc) == 0);
+	banks[1] ^= 1;
+	assert(deen_acc_get(&acc) == -EIO && deen_acc_set(&acc, 1) == -EIO);
+}
 int main(void)
 {
 	struct msm8953_cpuclk_domain d = {0};
@@ -367,4 +396,5 @@ int main(void)
 	test_cpufreq();
 	test_apss_readback();
 	test_retune();
+	test_mem_acc();
 }

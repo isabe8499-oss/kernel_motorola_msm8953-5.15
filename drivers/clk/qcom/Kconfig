@@ -61,6 +61,7 @@ config QCOM_DEEN_PVT1_CPUFREQ
 	bool "Motorola Deen PVT1 APSS CPUFreq handoff"
 	depends on ARM64 && OF && CPU_FREQ && REGULATOR && SMP && PM_GENERIC_DOMAINS
 	select QCOM_MSM8953_CPUCLK_CORE
+	select REGULATOR_DEEN_C100_MEM_ACC
 	help
 	  Register the C100 shared APSS clock provider and connect CPUFreq to CPR4
 	  suppliers. Read the running PLL and all three muxes before
