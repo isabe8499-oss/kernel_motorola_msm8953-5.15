@@ -45,6 +45,28 @@ config QCOM_CLK_APCS_MSM8916
 	  Say Y if you want to support CPU frequency scaling on devices
 	  such as msm8916.
 
+config QCOM_MSM8953_CPUCLK_CORE
+	bool
+
+config QCOM_MSM8953_CPUCLK_PREFLIGHT
+	bool "MSM8953 CPU clock resource preflight (compile test only)"
+	depends on ARM64 && COMPILE_TEST && REGULATOR && CPU_FREQ
+	select QCOM_MSM8953_CPUCLK_CORE
+	help
+	  Compile resource and speed-bin validation helpers for
+	  the MSM8953 CPU clock port and its shared-domain CPUFreq and transition code.
+	  This option builds the core without probing a device.
+
+config QCOM_DEEN_PVT1_CPUFREQ
+	bool "Motorola Deen PVT1 APSS CPUFreq handoff"
+	depends on ARM64 && OF && CPU_FREQ && REGULATOR && SMP && PM_GENERIC_DOMAINS
+	select QCOM_MSM8953_CPUCLK_CORE
+	select REGULATOR_DEEN_C100_MEM_ACC
+	help
+	  Register the C100 shared APSS clock provider and connect CPUFreq to CPR4
+	  suppliers. Read the running PLL and all three muxes before
+	  accepting frequency changes. Requires the stock clock binding.
+
 config QCOM_CLK_APCC_MSM8996
 	tristate "MSM8996 CPU Clock Controller"
 	select QCOM_KRYO_L2_ACCESSORS

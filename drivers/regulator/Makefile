@@ -173,3 +173,5 @@ obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
 obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
 
 ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG
+obj-$(CONFIG_QCOM_DEEN_PVT1_CPUFREQ) += deen-cpr4/
+obj-$(CONFIG_REGULATOR_DEEN_C100_MEM_ACC) += msm8953-deen-mem-acc.o

@@ -1,0 +1,142 @@
+name: Deen MSM8953 CPUCLK APSS and CPUFreq - ARM64 and C100 DTB
+
+on:
+  push:
+    branches:
+      - feat/deen-msm8953-cpu-clock-port-20261120
+  pull_request:
+    branches:
+      - audit/deen-stock-cpu-clock-two-clusters-20261120
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpuclk-first-slice:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout ACK 5.15 candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install LLVM18 and ARM64 compilation requirements
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            bc bison flex make python3 device-tree-compiler dwarves zstd lz4 libssl-dev libelf-dev \
+            clang-18 llvm-18 lld-18 gcc-aarch64-linux-gnu
+          echo "/usr/lib/llvm-18/bin" >> "$GITHUB_PATH"
+
+      - name: Stock reference and CPR4 clock transition tests
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/cpuclk-preflight"
+          git rev-parse HEAD | tee "$RUNNER_TEMP/cpuclk-preflight/sha.txt"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_stock_cpu_clock_two_cluster_gate.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/cpuclk-preflight/stock-reference-tests.log"
+          python3 -m unittest discover -s scripts \
+            -p 'test_deen_msm8953_cpuclk_preflight.py' -v \
+            2>&1 | tee "$RUNNER_TEMP/cpuclk-preflight/new-source-tests.log"
+
+      - name: Compile and link the ARM64 driver and build the PVT1 device tree
+        run: |
+          set -euo pipefail
+          export PATH="/usr/lib/llvm-18/bin:$PATH"
+          OUT="$RUNNER_TEMP/cpuclk-preflight-out"
+          LOG="$RUNNER_TEMP/cpuclk-preflight"
+          mkdir -p "$OUT"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 gki_defconfig \
+            2>&1 | tee "$LOG/gki.log"
+          cp "$OUT/.config" "$LOG/original-gki.config"
+          KCONFIG_CONFIG="$OUT/.config" scripts/kconfig/merge_config.sh -m \
+            "$OUT/.config" arch/arm64/configs/deen-msm8953-base.fragment
+          scripts/config --file "$OUT/.config" \
+            -d LTO_CLANG_FULL -e LTO_CLANG_THIN -d COMPILE_TEST -e ARCH_QCOM -e COMMON_CLK_QCOM -e REGULATOR -e CPU_FREQ \
+            -d QCOM_MSM8953_CPUCLK_PREFLIGHT -e QCOM_DEEN_PVT1_CPUFREQ
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig \
+            2>&1 | tee "$LOG/olddefconfig.log"
+          grep -E '^(CONFIG_(COMPILE_TEST|COMMON_CLK_QCOM|QCOM_MSM8953_CPUCLK_PREFLIGHT)=|# CONFIG_(COMPILE_TEST|COMMON_CLK_QCOM|QCOM_MSM8953_CPUCLK_PREFLIGHT) is not set)' "$OUT/.config" \
+            | tee "$LOG/kconfig-resolution.txt"
+          grep -Fxq '# CONFIG_COMPILE_TEST is not set' "$OUT/.config"
+          grep -Fxq 'CONFIG_COMMON_CLK_QCOM=y' "$OUT/.config"
+          grep -Fxq 'CONFIG_QCOM_MSM8953_CPUCLK_CORE=y' "$OUT/.config"
+          grep -Fxq 'CONFIG_QCOM_DEEN_PVT1_CPUFREQ=y' "$OUT/.config"
+          cp "$OUT/.config" "$LOG/pvt1-cpufreq.config"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 \
+            drivers/clk/qcom/clk-cpu-msm8953-preflight.o \
+            drivers/clk/qcom/clk-cpu-msm8953-transition.o \
+            drivers/clk/qcom/clk-cpu-msm8953-cpufreq.o \
+            drivers/clk/qcom/clk-cpu-msm8953-platform.o \
+            drivers/clk/qcom/clk-cpu-msm8953-apss.o \
+            drivers/regulator/deen-cpr4/ \
+            drivers/regulator/msm8953-deen-mem-acc.o \
+            2>&1 | tee "$LOG/cpuclk-object.log"
+          for part in preflight transition cpufreq platform apss; do
+            object="$OUT/drivers/clk/qcom/clk-cpu-msm8953-$part.o"
+            test -s "$object"
+            file "$object" | tee "$LOG/$part-format.txt"
+            grep -Eiq 'LLVM.*bitcode|ELF.*(aarch64|ARM64)' "$LOG/$part-format.txt"
+            sha256sum "$object" >> "$LOG/cpuclk-object.sha256"
+          done
+          test -s "$OUT/drivers/regulator/msm8953-deen-mem-acc.o"
+          grep -Fxq 'CONFIG_REGULATOR_DEEN_C100_MEM_ACC=y' "$OUT/.config"
+          ld.lld -r "$OUT"/drivers/clk/qcom/clk-cpu-msm8953-{preflight,transition,cpufreq,platform,apss}.o \
+            -o "$LOG/deen-dvfs.o"
+          llvm-nm -u "$LOG/deen-dvfs.o" > "$LOG/unresolved.txt"
+          if grep -Eq ' (msm8953_cpuclk_|deen_)' "$LOG/unresolved.txt"; then exit 1; fi
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 qcom/msm8953-motorola-deen-pvt1-dvfs.dtb \
+            2>&1 | tee "$LOG/c100-dtb.log"
+          DTB="$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1-dvfs.dtb"
+          python3 scripts/deen_validate_pvt1_dvfs_dtb.py "$DTB" | tee "$LOG/c100-bindings.txt"
+          sha256sum "$DTB" > "$LOG/c100-dtb.sha256"
+          echo 'PASS_PVT1_CPUFREQ_LINK' | tee "$LOG/gate.txt"
+
+      - name: Link the C100 engineering Image and record the exact build
+        if: github.event_name != 'push'
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/cpuclk-preflight-out"
+          PKG="$RUNNER_TEMP/deen-c100-engineering"
+          mkdir -p "$PKG"
+          grep -Fxq 'CONFIG_LTO_CLANG_THIN=y' "$OUT/.config"
+          grep -Fxq 'CONFIG_CFI_CLANG=y' "$OUT/.config"
+          make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 Image
+          llvm-readelf -h "$OUT/vmlinux" > "$PKG/elf-header.txt"
+          grep -Fq 'AArch64' "$PKG/elf-header.txt"
+          for driver in deen_apss_probe deen_acc_probe deen_probe spm_regulator_probe cpr4_apss_regulator_probe; do
+            grep -F "$driver" "$OUT/System.map" >> "$PKG/linked-drivers.txt"
+          done
+          cp "$OUT/arch/arm64/boot/Image" "$PKG/"
+          cp "$OUT/arch/arm64/boot/dts/qcom/msm8953-motorola-deen-pvt1-dvfs.dtb" "$PKG/"
+          python3 -c 'import sys; f=open(sys.argv[1],"rb"); f.seek(56); assert f.read(4)==b"ARM\x64"' "$PKG/Image"
+          cp "$OUT/.config" "$PKG/kernel.config"
+          git rev-parse HEAD > "$PKG/commit.txt"
+          (cd "$PKG" && sha256sum Image *.dtb kernel.config > SHA256SUMS)
+
+      - name: Upload the raw Image and integration DTB
+        if: success() && github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-c100-engineering-Image-dtb
+          path: ${{ runner.temp }}/deen-c100-engineering/
+          compression-level: 1
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Archive object and DTB validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deen-msm8953-cpuclk-first-slice-evidence-only
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/cpuclk-preflight/*.log
+            ${{ runner.temp }}/cpuclk-preflight/*.config
+            ${{ runner.temp }}/cpuclk-preflight/*.sha256
+            ${{ runner.temp }}/cpuclk-preflight/*.txt
