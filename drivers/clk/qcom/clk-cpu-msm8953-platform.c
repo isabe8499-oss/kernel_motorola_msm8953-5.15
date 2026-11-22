@@ -67,7 +67,7 @@ static void deen_release_vote(struct device *dev, void *data)
 	regulator_put(rail);
 }
 
-static struct regulator *deen_hold_vote(struct device *supplier)
+static struct regulator *deen_hold_vote(struct device *supplier, unsigned int corner)
 {
 	struct regulator **res, **held, *rail;
 	int ret;
@@ -83,11 +83,16 @@ static struct regulator *deen_hold_vote(struct device *supplier)
 		devres_free(res);
 		return rail;
 	}
-	ret = regulator_is_enabled(rail);
-	if (ret > 0)
+	/* The CPR4 virtual regulator starts disabled. Stage the corner for
+	 * the verified firmware clock before enabling its physical S5 vote.
+	 */
+	ret = regulator_list_voltage(rail, corner - 1);
+	if (ret >= 0 && ret != corner)
+		ret = -EINVAL;
+	if (ret >= 0)
+		ret = regulator_set_voltage(rail, corner, DEEN_MAX_CORNERS);
+	if (!ret)
 		ret = regulator_enable(rail);
-	else if (!ret)
-		ret = -ENODEV;
 	if (ret) {
 		regulator_put(rail);
 		devres_free(res);
@@ -140,7 +145,8 @@ static int deen_attach(struct platform_device *pdev, struct platform_device *sup
 	struct regulator *apc;
 	struct deen_handoff *h;
 	void __iomem *fuse;
-	unsigned int bin;
+	unsigned long boot_rate;
+	unsigned int bin, corner = 0;
 	int i, ret;
 
 	ret = msm8953_cpuclk_check_resources(supplier);
@@ -175,9 +181,16 @@ static int deen_attach(struct platform_device *pdev, struct platform_device *sup
 	ret = msm8953_cpuclk_read_plan(src->of_node, bin, &h->domain.plan);
 	if (ret)
 		return ret;
-	if (!deen_verify_rate(&h->domain, clk_get_rate(power)))
+	boot_rate = clk_get_rate(power);
+	for (i = 0; i < h->domain.plan.count; i++) {
+		if (h->domain.plan.levels[i].cpu_hz == boot_rate) {
+			corner = h->domain.plan.levels[i].corner;
+			break;
+		}
+	}
+	if (!corner || !deen_verify_rate(&h->domain, boot_rate))
 		return -EIO;
-	apc = deen_hold_vote(src);
+	apc = deen_hold_vote(src, corner);
 	if (IS_ERR(apc))
 		return PTR_ERR(apc);
 	ret = msm8953_cpuclk_domain_init(&h->domain, src, bin, power, perf, cci, apc);

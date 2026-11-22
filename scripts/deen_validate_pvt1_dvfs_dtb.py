@@ -55,10 +55,22 @@ equal(cells(clock, "clocks"), [phandle("/clocks/xo-board")], "XO")
 for node, key, target in [
     (clock, "vdd-cl-supply", corner), (ctrl, "vdd-supply", s5),
     (ctrl, "vdd-limit-supply", s5 + "/avs-limit-regulator"),
-    (ctrl, "qcom,apm-ctrl", soc + "/power-mux@b111000"),
+    (ctrl, "qcom,apm-ctrl", soc + "/power-mux@b1112a8"),
     (ctrl, "mem-acc-supply", soc + "/regulator@19461d4"),
 ]:
     equal(cells(node, key), [phandle(target)], key)
+
+saw = soc + "/voltage-controller@b1d2000"
+equal(cells(s5, "motorola,cci-saw"), [phandle(saw)], "S5 voltage controller")
+equal(cells(saw, "reg"), [0xb1d2000, 0x1000], "CCI SAW aperture")
+equal(cells(soc + "/power-mux@b1112a8", "reg"), [0xb1112a8, 12], "APM aperture")
+for name, start, size in [
+    ("memory@90001000", 0x90001000, 0x13ff000),
+    ("memory@aefd2000", 0xaefd2000, 0x2000),
+    ("memory@aefd4000", 0xaefd4000, 0x2c000),
+    ("ramoops@ef000000", 0xef000000, 0xc0000),
+]:
+    equal(cells("/reserved-memory/" + name, "reg"), [0, start, 0, size], name)
 
 clock_keys = [k for k in properties(clock) if k.startswith("qcom,speed") or k in ("reg", "reg-names")]
 cpr_keys = [k for k in properties(corner) if k.startswith(("qcom,", "regulator-"))]

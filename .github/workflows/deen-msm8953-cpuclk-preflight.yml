@@ -73,6 +73,7 @@ jobs:
             drivers/clk/qcom/clk-cpu-msm8953-cpufreq.o \
             drivers/clk/qcom/clk-cpu-msm8953-platform.o \
             drivers/clk/qcom/clk-cpu-msm8953-apss.o \
+            drivers/regulator/deen-cpr4/ \
             drivers/regulator/msm8953-deen-mem-acc.o \
             2>&1 | tee "$LOG/cpuclk-object.log"
           for part in preflight transition cpufreq platform apss; do
@@ -107,7 +108,7 @@ jobs:
           make O="$OUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 -j2 Image
           llvm-readelf -h "$OUT/vmlinux" > "$PKG/elf-header.txt"
           grep -Fq 'AArch64' "$PKG/elf-header.txt"
-          for driver in deen_apss_probe deen_acc_probe deen_probe; do
+          for driver in deen_apss_probe deen_acc_probe deen_probe spm_regulator_probe cpr4_apss_regulator_probe; do
             grep -F "$driver" "$OUT/System.map" >> "$PKG/linked-drivers.txt"
           done
           cp "$OUT/arch/arm64/boot/Image" "$PKG/"

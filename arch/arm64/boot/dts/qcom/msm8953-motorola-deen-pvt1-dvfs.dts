@@ -6,6 +6,34 @@
  */
 #include "msm8953-motorola-deen-pvt1.dts"
 
+/* Keep firmware-owned splash and crash buffers out of the page allocator.
+ * Addresses are from the original C100 FDT, including its TZ/watchdog map.
+ */
+&{/reserved-memory} {
+	memory@90001000 {
+		reg = <0 0x90001000 0 0x13ff000>;
+		no-map;
+	};
+
+	memory@aefd2000 {
+		reg = <0 0xaefd2000 0 0x2000>;
+		no-map;
+	};
+
+	memory@aefd4000 {
+		reg = <0 0xaefd4000 0 0x2c000>;
+		no-map;
+	};
+
+	ramoops@ef000000 {
+		compatible = "ramoops";
+		reg = <0 0xef000000 0 0xc0000>;
+		console-size = <0x40000>;
+		pmsg-size = <0x40000>;
+		record-size = <0x40000>;
+	};
+};
+
 &soc {
 	deen_apss: clock-controller@b116000 {
 		compatible = "qcom,cpu-clock-8953";
@@ -54,9 +82,14 @@
 			2016000>;
 	};
 
-	deen_apm: power-mux@b111000 {
+	deen_cci_saw: voltage-controller@b1d2000 {
+		compatible = "motorola,deen-c100-cci-saw";
+		reg = <0xb1d2000 0x1000>;
+	};
+
+	deen_apm: power-mux@b1112a8 {
 		compatible = "qcom,msm8953-apm";
-		reg = <0xb111000 0x1000>;
+		reg = <0xb1112a8 0xc>;
 		reg-names = "pm-apcc-glb";
 		qcom,apm-post-halt-delay = <2>;
 		qcom,apm-halt-clk-delay = <17>;
@@ -79,7 +112,7 @@
 	};
 
 	cpr4: regulator-controller@b018000 {
-		compatible = "qcom,cpr4-msm8953-apss-regulator";
+		compatible = "motorola,deen-c100-cpr4", "qcom,cpr4-msm8953-apss-regulator";
 		reg = <0xb018000 0x4000 0xa4000 0x1000>;
 		reg-names = "cpr_ctrl", "fuse_base";
 		interrupts = <0 15 1>;
@@ -322,7 +355,8 @@
 &spmi_bus {
 	pmic@1 {
 		deen_s5: regulator@2000 {
-			compatible = "qcom,spm-regulator";
+			compatible = "motorola,deen-c100-s5", "qcom,spm-regulator";
+			motorola,cci-saw = <&deen_cci_saw>;
 			reg = <0x2000>;
 			regulator-name = "pm8953_s5";
 			regulator-min-microvolt = <400000>;

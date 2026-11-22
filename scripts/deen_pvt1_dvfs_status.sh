@@ -28,4 +28,10 @@ $3~/^corner=[1-9]$/ && $4~/^up=[0-9]+$/ && $5~/^down=[0-9]+$/ {
   ok = (c[2]*2 == i[2]*5 && u[2]+0 > 0 && d[2]+0 > 0)
 }
 END { exit !ok }' || skip "need verified transitions in both directions and a valid current snapshot"
-printf '%s\n' 'PASS C100 CPUFreq up/down, PLL and CCI readback, virtual CPR4 corner'
+set -- /sys/bus/platform/drivers/qcom,spm-regulator/*/s5_microvolts
+[ "$#" -eq 1 ] && [ -r "$1" ] || skip "S5 hardware readback unavailable"
+uv=$(cat "$1") || skip "CCI SAW voltage read failed"
+case "$uv" in ''|*[!0-9]*) skip "invalid S5 voltage";; esac
+[ "$uv" -ge 400000 ] && [ "$uv" -le 1140000 ] || skip "S5 outside C100 constraints"
+printf 's5_microvolts=%s\n' "$uv"
+printf '%s\n' 'PASS C100 CPUFreq up/down, PLL and CCI readback, CPR4 corner and S5 status'
