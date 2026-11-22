@@ -68,10 +68,15 @@ for name, start, size in [
     ("memory@90001000", 0x90001000, 0x13ff000),
     ("memory@aefd2000", 0xaefd2000, 0x2000),
     ("memory@aefd4000", 0xaefd4000, 0x2c000),
-    ("ramoops@ef000000", 0xef000000, 0xc0000),
+    ("ramoops@ef000000", 0xef000000, 0xa0000),
+    ("memory@ef0a0000", 0xef0a0000, 0x20000),
 ]:
     equal(cells("/reserved-memory/" + name, "reg"), [0, start, 0, size], name)
 
+ramoops = "/reserved-memory/ramoops@ef000000"
+for key, size in [("record-size", 0x20000), ("console-size", 0x40000), ("pmsg-size", 0x40000)]:
+    equal(cells(ramoops, key), [size], key)
+equal(cells(policy, "vdd-s5-supply"), [phandle(s5)], "readback from S5")
 clock_keys = [k for k in properties(clock) if k.startswith("qcom,speed") or k in ("reg", "reg-names")]
 cpr_keys = [k for k in properties(corner) if k.startswith(("qcom,", "regulator-"))]
 equal(digest(clock, clock_keys), "d3215ce11e02935035a5b9b352e5c899e595c76ae3f7d5768762822dbc2bf875",

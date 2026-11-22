@@ -72,6 +72,11 @@ struct deen_saw *deen_saw_get(struct device *dev)
 	return saw;
 }
 
+bool deen_saw_avs_enabled(struct deen_saw *saw)
+{
+	return !!(readl(saw->base + SAW_AVS_CTL) & SAW_AVS_ENABLE);
+}
+
 int deen_saw_get_vdd(struct deen_saw *saw)
 {
 	u32 status;

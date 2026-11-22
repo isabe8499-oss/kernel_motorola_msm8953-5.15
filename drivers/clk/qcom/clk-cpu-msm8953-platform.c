@@ -9,12 +9,17 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/slab.h>
+#include <linux/utsname.h>
+#include <linux/random.h>
 
 #include "clk-cpu-msm8953.h"
 #include "clk-cpu-msm8953-readback.h"
 
 struct deen_handoff {
 	struct msm8953_cpuclk_domain domain;
+	struct regulator *s5;
+	u32 boot_cookie;
+	bool reported[2];
 	void __iomem *pll;
 	void __iomem *mux[3];
 };
@@ -24,6 +29,32 @@ static bool deen_verify_rate(struct msm8953_cpuclk_domain *domain, unsigned long
 	struct deen_handoff *h = container_of(domain, struct deen_handoff, domain);
 
 	return deen_apss_rate_matches(h->pll, h->mux, hz);
+}
+
+/* Log each direction once after hardware readback. Ramoops keeps these
+ * messages for recovery even when the candidate has no display or USB.
+ * Caller owns the transition lock, so CPU, CCI and corner share a snapshot.
+ */
+static void deen_record_transition(struct msm8953_cpuclk_domain *d, bool up)
+{
+	struct deen_handoff *h = container_of(d, struct deen_handoff, domain);
+	unsigned long cpu, cci;
+	int uv, corner;
+
+	if (h->reported[up])
+		return;
+	cpu = clk_get_rate(d->power);
+	cci = clk_get_rate(d->cci);
+	corner = regulator_get_voltage(d->apc);
+	uv = regulator_get_voltage(h->s5);
+	if (uv < 400000 || uv > 1140000 || corner < 1 || corner > DEEN_MAX_CORNERS ||
+	    !deen_verify_rate(d, cpu) || (u64)cpu * 2 != (u64)cci * 5)
+		return;
+	h->reported[up] = true;
+	dev_notice(d->dev,
+		   "Deen C100 DVFS kernel=%s session=%08x direction=%s cpu_hz=%lu cci_hz=%lu corner=%d s5_uv=%d up=%llu down=%llu\n",
+		   init_utsname()->release, h->boot_cookie, up ? "up" : "down",
+		   cpu, cci, corner, uv, d->verified_up, d->verified_down);
 }
 
 static void deen_clk_put(void *data)
@@ -196,6 +227,11 @@ static int deen_attach(struct platform_device *pdev, struct platform_device *sup
 	ret = msm8953_cpuclk_domain_init(&h->domain, src, bin, power, perf, cci, apc);
 	if (ret)
 		return ret;
+	h->s5 = devm_regulator_get_optional(dev, "vdd-s5");
+	if (IS_ERR(h->s5))
+		return PTR_ERR(h->s5);
+	h->boot_cookie = get_random_u32();
+	h->domain.record_transition = deen_record_transition;
 	h->domain.verify_rate = deen_verify_rate;
 	h->domain.program = deen_apss_program;
 	platform_set_drvdata(pdev, h);

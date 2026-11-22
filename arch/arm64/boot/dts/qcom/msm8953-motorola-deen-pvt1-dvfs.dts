@@ -27,10 +27,18 @@
 
 	ramoops@ef000000 {
 		compatible = "ramoops";
-		reg = <0 0xef000000 0 0xc0000>;
+		reg = <0 0xef000000 0 0xa0000>;
 		console-size = <0x40000>;
 		pmsg-size = <0x40000>;
-		record-size = <0x40000>;
+		record-size = <0x20000>;
+	};
+
+	/* Original recovery puts the console at +0x20000 and pmsg at
+	 * +0x60000. Keep its annotation area and remaining padding intact.
+	 */
+	memory@ef0a0000 {
+		reg = <0 0xef0a0000 0 0x20000>;
+		no-map;
 	};
 };
 
@@ -68,6 +76,7 @@
 
 	cpufreq {
 		compatible = "qcom,msm-cpufreq";
+		vdd-s5-supply = <&deen_s5>;
 		clock-names = "l2_clk", "cpu0_clk", "cpu1_clk", "cpu2_clk", "cpu3_clk", "cpu4_clk", "cpu5_clk", "cpu6_clk", "cpu7_clk";
 		clocks = <&deen_apss 0x96854074>,
 			<&deen_apss 0x2e6af930>,

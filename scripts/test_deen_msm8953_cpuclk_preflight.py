@@ -89,6 +89,20 @@ class TestCpuClockPreflight(unittest.TestCase):
                             "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True)
 
+    def test_saw_and_apm_hardware_acknowledgements(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            includes = Path(tmp) / "linux"
+            includes.mkdir()
+            for header in ("bitfield", "delay", "io", "iopoll", "of_address", "slab", "device"):
+                (includes / (header + ".h")).touch()
+            binary = Path(tmp) / "power"
+            subprocess.run(["cc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
+                            "-fsanitize=undefined", "-I", tmp,
+                            "-I", str(ROOT / "drivers/regulator/deen-cpr4"),
+                            str(ROOT / "scripts/test_deen_saw_apm.c"),
+                            "-o", str(binary)], check=True)
+            subprocess.run([str(binary)], check=True)
+
     def test_ref_is_not_runtime_validation(self):
         m = self.manifest
         self.assertFalse(m["stock_cpu_clock"]["clock_frequency_is_measured_runtime"])

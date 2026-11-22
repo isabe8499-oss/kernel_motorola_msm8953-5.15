@@ -152,6 +152,8 @@ static int transition(struct msm8953_cpuclk_domain *d, unsigned long rate)
 			d->verified_up++;
 		else
 			d->verified_down++;
+		if (d->record_transition)
+			d->record_transition(d, next->cpu_hz > old->cpu_hz);
 	}
 	return 0;
 }

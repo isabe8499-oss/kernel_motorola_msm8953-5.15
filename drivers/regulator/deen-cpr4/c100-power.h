@@ -13,6 +13,7 @@ enum msm_apm_supply {
 };
 
 struct deen_saw *deen_saw_get(struct device *dev);
+bool deen_saw_avs_enabled(struct deen_saw *saw);
 int deen_saw_get_vdd(struct deen_saw *saw);
 int deen_saw_set_vdd(struct deen_saw *saw, unsigned int level);
 int deen_saw_set_limit(struct deen_saw *saw, unsigned int low, unsigned int high);

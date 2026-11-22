@@ -41,6 +41,7 @@ struct msm8953_cpuclk_domain {
 	struct regulator *apc;
 	u64 verified_up, verified_down;
 	int (*program)(struct msm8953_cpuclk_domain *d, unsigned long hz);
+	void (*record_transition)(struct msm8953_cpuclk_domain *d, bool up);
 	bool (*verify_rate)(struct msm8953_cpuclk_domain *d, unsigned long hz);
 };
 

@@ -772,27 +772,37 @@ static int qpnp_ult_hf_init_range(struct spm_vreg *vreg)
 	return rc;
 }
 
-static int qpnp_smps_init_voltage(struct spm_vreg *vreg)
+static int qpnp_smps_init_voltage(struct spm_vreg *vreg,
+				 const struct regulation_constraints *limits)
 {
-	int rc;
+	int level, uv, rc;
 
 	rc = qpnp_smps_read_voltage(vreg);
-	if (rc) {
-		pr_err("%s: voltage read failed, rc=%d\n", vreg->rdesc.name,
-			rc);
+	if (rc)
 		return rc;
+	level = deen_saw_get_vdd(vreg->saw);
+	if (level < 0)
+		return level;
+
+	/* With AVS already running, PMIC's programmed setpoint can differ
+	 * from the completed SAW request. Adopt the running voltage. With
+	 * AVS off, seed port zero from the PMIC as in the Motorola driver.
+	 */
+	if (!deen_saw_avs_enabled(vreg->saw)) {
+		if (vreg->last_set_uV < limits->min_uV || vreg->last_set_uV > limits->max_uV)
+			return -ERANGE;
+		if (level != vreg->last_set_vlevel) {
+			rc = deen_saw_set_vdd(vreg->saw, vreg->last_set_vlevel);
+			if (rc)
+				return rc;
+			level = vreg->last_set_vlevel;
+		}
 	}
-
-	vreg->vlevel = vreg->last_set_vlevel;
-	vreg->uV = vreg->last_set_uV;
-
-	/* Adopt the firmware voltage only after both hardware interfaces agree. */
-	rc = deen_saw_get_vdd(vreg->saw);
-	if (rc < 0)
-		return rc;
-	if (rc != vreg->vlevel)
-		return -EIO;
-
+	uv = spm_regulator_vlevel_to_uv(vreg, level);
+	if (uv < limits->min_uV || uv > limits->max_uV)
+		return -ERANGE;
+	vreg->last_set_vlevel = vreg->vlevel = level;
+	vreg->last_set_uV = vreg->uV = uv;
 	return 0;
 }
 
@@ -1124,10 +1134,6 @@ static int spm_regulator_probe(struct platform_device *pdev)
 	if (rc)
 		return rc;
 
-	rc = qpnp_smps_init_voltage(vreg);
-	if (rc)
-		return rc;
-
 	rc = qpnp_smps_init_mode(vreg);
 	if (rc)
 		return rc;
@@ -1160,6 +1166,10 @@ static int spm_regulator_probe(struct platform_device *pdev)
 			__func__, rc);
 		return rc;
 	}
+
+	rc = qpnp_smps_init_voltage(vreg, &init_data->constraints);
+	if (rc)
+		return dev_err_probe(&pdev->dev, rc, "S5 PMIC/SAW voltage handoff failed\n");
 
 	vreg->rdesc.name	= init_data->constraints.name;
 	vreg->rdesc.type	= REGULATOR_VOLTAGE;

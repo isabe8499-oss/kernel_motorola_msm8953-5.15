@@ -218,7 +218,7 @@ int cpr3_read_fuse_param(void __iomem *fuse_base_addr,
 
 		fuse_val = readq_relaxed(fuse_base_addr
 					 + param->row * BYTES_PER_FUSE_ROW);
-		val = (fuse_val >> param->bit_start) & ((1ULL << bits) - 1);
+		val = (fuse_val >> param->bit_start) & (U64_MAX >> (64 - bits));
 		*param_value |= val << bits_total;
 		bits_total += bits;
 
